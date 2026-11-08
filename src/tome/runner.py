@@ -48,8 +48,8 @@ def run_simulation_cycle(
     seed: int | None = None,
 ) -> tuple[WorldState, list[Proposal], list[list[PeerEvaluation]]]:
     """
-    Execute a single downtime simulation cycle across all factions.
-    Pure state transformer: f(WorldState_t) -> WorldState_{t+1}
+    Execute a single simulation cycle across all system actors/factions.
+    Pure state transformer: M(WorldState_t, Interventions) -> WorldState_{t+1}
     """
     # 1. Immutable Turn Order Snapshot
     turn_order = sort_factions_by_urgency(state.factions)
