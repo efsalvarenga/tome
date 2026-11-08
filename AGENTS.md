@@ -38,3 +38,5 @@ This document specifies repository calibration, architectural invariants, and ag
 * `main` is protected: PR required, force pushes blocked, deletions blocked, auto-branch deletion enabled.
 * Development branches use clear prefixes: `feat/`, `fix/`, `docs/`, `chore/`.
 * Commits should be atomic with clear semantic messages.
+* **Autonomous Merge Prohibition [HUMAN-ONLY]:** Under NO circumstances may any autonomous agent call `gh pr merge`, invoke GitHub REST merge API endpoints, or merge topic branches directly into `main`. Merging PRs into `main` is strictly reserved for the human developer. Agents must push topic branches, open Pull Requests with verification proofs, present the PR URL to the user, and stop.
+
