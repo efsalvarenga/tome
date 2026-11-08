@@ -1,46 +1,109 @@
 # Triple-O Matrix Engine (TOME)
 
-[![CI](https://github.com/efsalvarenga/tome/actions/workflows/tome-cycle.yml/badge.svg)](https://github.com/efsalvarenga/tome/actions)
 [![License: MIT](https://img.shields.io/badge/Code_License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![License: CC BY-SA 4.0](https://img.shields.io/badge/Content_License-CC_BY--SA_4.0-lightgrey.svg)](https://creativecommons.org/licenses/by-sa/4.0/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 
-A standalone, serverless, turn-based faction simulation engine and companion Progressive Web App (PWA) client for tabletop roleplaying campaigns.
+A serverless, turn-based simulation engine and companion exploration dashboard for modeling **complex, multi-agent systems where fundamental behavioral dynamics are incomplete, uncertain, or emergent**.
 
-TOME simulates faction initiatives during campaign downtime without relying on conversational consensus or unconstrained LLM hallucinations. It models world evolution as a pure state transformer:
+TOME provides a formal computational framework for analysts and human umpires to explore **plausible realisations of multi-actor interactions** across geopolitical, strategic, institutional, and socio-technical domains.
 
-$$f(\text{WorldState}_{t}, \text{InputParameters}) \longrightarrow \text{WorldState}_{t+1} + \text{DowntimeDossier}_{\text{Tier 2}}$$
+$$\mathcal{M}(\text{WorldState}_{t}, \text{Interventions}) \longrightarrow \text{WorldState}_{t+1} + \text{SimulationDossier}$$
 
 ---
 
-## Theoretical Foundation
+## The Problem: Simulating Under Incomplete Behavioral Knowledge
 
-TOME fuses two pioneering tabletop roleplaying game frameworks:
+Traditional multi-agent simulations rely on closed-form mathematical equations, utility optimization functions, or rigid heuristic state machines. In complex human, organizational, and strategic systems, these models frequently break down because:
 
-1. **Chris Engle Matrix Games:**
-   Actions are formulated as structured arguments rather than freeform narrative prompts:
-   * **World-Change Statement:** A single declarative assertion specifying an altered fact in the world.
-   * **Supporting Arguments (Pros):** Claims grounded strictly in existing canon facts or intrinsic faction traits.
-   * **Peer Adjudication:** Non-active factions evaluate baseline plausibility, apply strategic shifts (The Cheeky Pivot), and cast weighted votes determining the resolution modifier.
+1. **The fundamentals of agent behavior are not all known:** Human and institutional actors do not act according to fixed differential equations; they adapt creatively, perceive situations through motivated biases, and change doctrines under stress.
+2. **Generative LLMs suffer from ungrounded mode collapse:** Pure conversational LLM rollouts either drift into unconstrained hallucinations (inventing non-existent facts and capabilities) or collapse into generic, bland consensus.
+3. **The Umpire requires observable, stochastic realisations:** Rather than seeking a single "optimal" trajectory, an analyst or simulation umpire needs to observe the *envelope of plausible realisations*—including institutional friction, unexpected complications, and counter-realities.
 
-2. **Cezar Capacle's Triple-O Framework:**
-   Faction behavior and divergence are driven by structural posture and spark tables:
-   * **Posture Step-Dice:** Faction structural integrity dictates its posture die: `Stable` ($1d4$), `Pressured` ($1d6$), or `Cornered` ($1d8$).
-   * **The Triple-O Split:**
-     * **1–3 (The Obvious):** Predictable initiatives aligning with core traits ($75\%$ Stable, $50\%$ Pressured, $37.5\%$ Cornered).
-     * **4–5 (The Option):** Lateral, strategically logical alternatives ($25\%$ Stable, $33.3\%$ Pressured, $25\%$ Cornered).
-     * **6+ (The Odd):** Volatile gambits, doctrinal shifts, or radical escalations ($0\%$ Stable, $16.7\%$ Pressured, $37.5\%$ Cornered).
-   * **Dual Spark Table Seeding:** Paired $d66$ rolls across Action, Focus, Method, Disposition, and Motivation tables force semantic divergence and prevent LLM mode-collapse.
+TOME solves this by wedding **Chris Engle Matrix Games** with **Cezar Capacle's Triple-O framework** inside a strictly grounded, deterministic state transformer.
+
+---
+
+## Theoretical Architecture
+
+```text
+                                  ┌────────────────────────┐
+                                  │   Structural Posture   │
+                                  │  Stable / Pressured /  │
+                                  │        Cornered        │
+                                  └───────────┬────────────┘
+                                              │ Step-Die (d4, d6, d8)
+                                              ▼
+┌───────────────────────┐         ┌────────────────────────┐
+│   Dual Spark Tables   ├────────►│  Triple-O Action Tier  │
+│ Paired d66 Divergence │         │ Obvious / Option / Odd │
+└───────────────────────┘         └───────────┬────────────┘
+                                              │
+                                              ▼
+                                  ┌────────────────────────┐
+                                  │ Structured Proposal    │
+                                  │ Statement + Grounded   │
+                                  │ Pros (Traits & Canon)  │
+                                  └───────────┬────────────┘
+                                              │
+                                              ▼
+                                  ┌────────────────────────┐
+                                  │ Subagent Peer Review   │
+                                  │ Plausibility + Motivated│
+                                  │ Reasoning Pivot        │
+                                  └───────────┬────────────┘
+                                              │
+                                              ▼
+                                  ┌────────────────────────┐
+                                  │ Epistemic Linter Gate  │
+                                  │ (Revert Hallucinations)│
+                                  └───────────┬────────────┘
+                                              │ Net Modifier [-3, +3]
+                                              ▼
+                                  ┌────────────────────────┐
+                                  │ 2d6 Resolution Matrix  │
+                                  │ 10+: Ratified Reality  │
+                                  │ 7-9: Fractured Reality │
+                                  │ 4-6: Contested Friction│
+                                  │ <=3: Counter-Reality   │
+                                  └────────────────────────┘
+```
+
+### 1. Engle Matrix Argumentation
+Originally developed for professional wargaming, policy analysis, and strategic conflict studies, Matrix Games model reality through **structured epistemic argumentation** rather than physical calculations:
+* **World-Change Statement:** A declarative claim that an actor alters a state variable or geopolitical/institutional reality.
+* **Supporting Arguments (Pros):** Concrete arguments grounded strictly in established canon facts or intrinsic actor traits.
+* **Adversarial Peer Review:** Other actors in the system evaluate baseline plausibility from their operational perspectives, apply strategic motivated shifts (*The Cheeky Pivot*), and argue complications or counter-arguments.
+
+### 2. Triple-O Behavioral Posture & Divergence
+Actors shift behavioral modes based on their internal structural integrity:
+* **Structural Posture:**
+  * **Stable ($1d4$):** Institutionally secure. $75\%$ predictable doctrinal moves (*The Obvious*), $25\%$ lateral innovations (*The Option*), $0\%$ radical gambits.
+  * **Pressured ($1d6$):** Under operational friction or resource strain. $50\%$ Obvious, $33.3\%$ Option, $16.7\%$ volatile gambits (*The Odd*).
+  * **Cornered ($1d8$):** Existential threat or institutional crisis. $37.5\%$ Obvious, $25\%$ Option, $37.5\%$ radical gambits (*The Odd*).
+* **Dual Spark Seeding ($d66$):** Paired stochastic seeds across Action, Focus, Method, Disposition, and Motivation force semantic divergence and prevent the engine from settling into predictable LLM attractors.
+
+### 3. Epistemic Linter Gate (Anti-Hallucination Invariant)
+To prevent generative agents from fabricating capabilities or inventing non-existent historical precedents:
+* Any actor attempting to shift its vote must cite an **exact, unexhausted canon fact or faction trait**.
+* If the citation fails string verification or cites an already exhausted capability, the linter gate **reverts the vote to baseline**.
+* Validly cited traits are flagged as exhausted for the simulation cycle, preventing infinite leverage.
+
+### 4. Matrix Resolution Bands
+The net peer consensus modifier ($\text{clamp}(\sum \text{votes}, -3, 3)$) adjusts a $2d6$ dice roll against Target Number 7:
+* **$10+$ (Ratified Reality):** The proposed change manifests into canon facts; the actor improves posture; the highest supporting peer gains secondary leverage.
+* **$7\text{–}9$ (Fractured Reality):** The change manifests, but the sharpest counter-argument crystallizes into an active complication hook.
+* **$4\text{–}6$ (Contested Friction):** The change fails to manifest; both the proposal and opposing arguments become ambient intelligence/rumors.
+* **$\le 3$ (Counter-Reality):** The initiative catastrophically backfires; the strongest counter-argument crystallizes as the new reality; the active actor degrades in posture.
 
 ---
 
 ## Architectural Principles
 
-* **Zero Recurring Infrastructure Cost:** Executes entirely on free-tier serverless orchestration (GitHub Actions runners for compute, GitHub Pages for static client hosting).
-* **Deterministic Mechanical Core:** Dice mechanics, spark table selections, posture step transitions, and validation gates run in pure, deterministic Python with zero network dependencies.
-* **Strict Epistemic Grounding (The Linter Gate):** Peer reviewers cannot invent setting details or apply arbitrary voting modifiers. Any vote shift must cite an exact, unexhausted canon fact or faction trait; invalid or hallucinated citations revert immediately to baseline.
-* **Air-Gapped Access Control & Cost Containment:** 4-layer defense in depth: client-side Personal Access Token (PAT) storage, workflow execution passcode gate, concurrency execution locks, and provider-level budget spend ceilings.
-* **Elephant-Goldfish Model (EGM) Governance:** All architectural stages and state schemas follow formal specifications (`docs/designs/`) verified by zero-context adversarial reviews (`docs/reviews/`) and mechanical contract linters.
+* **Deterministic Mechanical Core:** All dice rolls, spark table lookups, posture transitions, linter gates, and resolution matrices execute in pure, reproducible Python with zero network calls.
+* **Zero Recurring Infrastructure Cost:** Serverless GitOps architecture running on GitHub Actions for compute and GitHub Pages for static exploration client interfaces.
+* **Air-Gapped Access Control & Cost Containment:** 4-layer defense in depth: client-side Personal Access Token (PAT) storage, workflow execution passcodes, concurrency execution locks, and cloud spend limits.
+* **Umpire Dossier Emission:** Every simulation cycle outputs both an updated machine-readable state ledger (`world_state.json`, `history.jsonl`) and an analytical briefing dossier (`_sessions/_downtime/cycle_XX.md`) detailing actor rationales, peer challenges, and emergent friction.
 
 ---
 
@@ -54,7 +117,7 @@ tome/
 │   └── reviews/            # Adversarial zero-context Goldfish reviews
 │       └── 001_tome_core_architecture_review.md
 ├── src/
-│   └── tome/               # Core Python engine package
+│   └── tome/               # Core Python simulation engine
 │       ├── __init__.py     # Package entrypoint & version
 │       ├── dice.py         # Step-dice (1d4, 1d6, 1d8), d66, and 2d6 resolution
 │       ├── models.py       # Pydantic v2 schemas (WorldState, Faction, Proposal, PeerEvaluation)
@@ -77,9 +140,7 @@ tome/
 * Python 3.11 or later
 * [`uv`](https://docs.astral.sh/uv/) (recommended) or standard `pip`
 
-### Installation
-
-Clone the repository and set up a development environment:
+### Setup
 
 ```bash
 git clone https://github.com/efsalvarenga/tome.git
@@ -93,29 +154,19 @@ source .venv/bin/activate
 uv pip install -e ".[dev]"
 ```
 
-### Running Tests
+### Running the Mechanical Verification Suite
 
-Execute the deterministic mechanical test suite:
+Execute the deterministic test suite:
 
 ```bash
 pytest
 ```
 
-### Code Formatting & Linting
-
-Verify formatting and linting compliance with `ruff`:
+### Code Formatting & Static Analysis
 
 ```bash
 ruff check .
 ruff format --check .
-```
-
-### Validating EGM Specification Contracts
-
-If `artifice` is available in your environment, validate specification contracts:
-
-```bash
-python3 path/to/artifice/scripts/validate_egm.py .
 ```
 
 ---
@@ -132,5 +183,5 @@ This software implements game mechanics derived from:
 
 TOME is an open-source project licensed under a dual-license structure:
 
-* **Source Code:** Licensed under the [MIT License](LICENSE) — free for use, modification, and distribution.
-* **Game Mechanics, Spark Tables & Textual Documentation:** Licensed under the [Creative Commons Attribution-ShareAlike 4.0 International License (CC BY-SA 4.0)](https://creativecommons.org/licenses/by-sa/4.0/).
+* **Simulation Engine & Software Code:** Licensed under the [MIT License](LICENSE) — freely available for analytical, research, educational, and commercial integration.
+* **Game Mechanics, Spark Tables & Content:** Licensed under the [Creative Commons Attribution-ShareAlike 4.0 International License (CC BY-SA 4.0)](https://creativecommons.org/licenses/by-sa/4.0/).

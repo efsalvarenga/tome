@@ -9,25 +9,25 @@
 
 ## 1. Overview & Objectives
 
-The **Triple-O Matrix Engine (TOME)** is a stateless, turn-based faction simulation engine for tabletop roleplaying campaigns. It synthesizes the structured argumentation and mechanical probability resolution of **Chris Engle Matrix Games** with the behavioral divergence mechanics of **Cezar Capacle's Triple-O framework**.
+The **Triple-O Matrix Engine (TOME)** is a stateless, turn-based simulation engine for exploring emergent realisations in complex multi-agent systems where fundamental behavioral dynamics are incomplete, uncertain, or emergent. It synthesizes the structured argumentation and mechanical probability resolution of **Chris Engle Matrix Games** with the behavioral divergence mechanics of **Cezar Capacle's Triple-O framework**.
 
-TOME models faction actions during campaign downtime without relying on conversational consensus or unconstrained LLM hallucinations. The engine operates as a pure state transformer:
+TOME models multi-actor interactions, institutional friction, and strategic adaptations without relying on conversational consensus, fixed utility equations, or unconstrained LLM hallucinations. The engine operates as a pure state transformer for human umpires and analysts:
 
-$$f(\text{WorldState}_{t}, \text{InputParameters}) \longrightarrow \text{WorldState}_{t+1} + \text{DowntimeDossier}_{\text{Tier 2}}$$
+$$\mathcal{M}(\text{WorldState}_{t}, \text{Interventions}) \longrightarrow \text{WorldState}_{t+1} + \text{SimulationDossier}$$
 
 ### Goals
 
 * **Deterministic Mechanical Core:** Dice mechanics (posture step-dice $1d4, 1d6, 1d8$; resolution $2d6$), spark table lookups ($d66$), posture transitions, immutable order-of-operations sorting, and validation gates execute purely in deterministic Python with zero network calls.
-* **Strict Epistemic Grounding (The Linter Gate):** Subagent peer reviewers and proposal authors cannot invent setting details or apply arbitrary voting shifts. Grounding checks enforce whitespace-stripped exact matching against existing `canon_facts` or intrinsic faction `traits`.
-* **Zero Recurring Infrastructure Cost:** Standalone repository designed for serverless execution via GitHub Actions with a static PWA client hosted on GitHub Pages.
+* **Strict Epistemic Grounding (The Linter Gate):** Subagent peer reviewers and proposal authors cannot invent setting details or apply arbitrary voting shifts. Grounding checks enforce whitespace-stripped exact matching against existing `canon_facts` or intrinsic actor `traits`.
+* **Zero Recurring Infrastructure Cost:** Standalone repository designed for serverless execution via GitHub Actions with a static exploration client hosted on GitHub Pages.
 * **Cost & Security Containment:** Workflow passcode fail-gate, Personal Access Token (PAT) client storage, execution concurrency locks, and hard budget spend ceilings.
 * **Frontier LLM Binding:** Google Gemini (`google-genai` / Gemini Flash) constrained by Pydantic JSON schemas for semantic proposal formulation and peer adjudication.
 
 ### Non-Goals
 
 * Real-time multiplayer synchronization or persistent backend server daemon (the engine runs purely on-demand via serverless GitHub Actions dispatch).
-* Open-ended conversational chat simulation between factions (all interactions are strictly structured into Proposal and Adjudication phases).
-* Direct in-engine hosting of the full campaign vault markdown corpus (TOME operates as a standalone engine that ingests and emits standardized JSON state and markdown downtime dossiers).
+* Open-ended conversational chat simulation between actors (all interactions are strictly structured into Proposal, Grounding, and Adjudication phases).
+* Direct in-engine hosting of external narrative vaults (TOME operates as a standalone engine that ingests and emits standardized JSON state and analytical simulation dossiers).
 
 ---
 
@@ -229,7 +229,7 @@ Resolution roll: $2d6 + \text{Net Modifier}$ against target number 7:
 3. **End of Cycle:**
    a. Clear all `exhausted_traits` for all factions.
    b. Increment `session_index`.
-   c. Atomically serialize updated `world_state.json`, append resolved turn ledger to `history.jsonl`, and compile markdown dossier to `_sessions/_downtime/cycle_XX.md`.
+   c. Atomically serialize updated `world_state.json`, append resolved turn ledger to `history.jsonl`, and compile analytical simulation dossier to `dossiers/cycle_XX.md`.
 
 ---
 

@@ -4,15 +4,16 @@ This document specifies repository calibration, architectural invariants, and ag
 
 ## 1. Project Overview & Architectural Boundaries
 
-* **Repository Identity:** `tome` is a standalone, serverless, turn-based faction simulation engine and companion PWA client.
-* **Parent Concept:** Integrates **Chris Engle Matrix Games** (structured arguments and probability resolution) with **Cezar Capacle's Triple-O framework** (posture step-dice and dual spark tables).
+* **Repository Identity:** `tome` is a standalone, serverless simulation engine for multi-agent complex systems where fundamental behavioral laws are incomplete or uncertain, providing a formal computational testbed for human umpires and analysts to explore plausible realisations of multi-actor interactions.
+* **Parent Concept:** Integrates **Chris Engle Matrix Games** (structured epistemic argumentation and probability resolution under uncertainty) with **Cezar Capacle's Triple-O framework** (structural posture step-dice and dual spark tables for non-mode-collapsing divergence).
 * **GitOps State Flow:** Pure state transformer:
-  $$f(\text{WorldState}_{t}, \text{InputParameters}) \longrightarrow \text{WorldState}_{t+1} + \text{DowntimeDossier}_{\text{Tier 2}}$$
+  $$\mathcal{M}(\text{WorldState}_{t}, \text{Interventions}) \longrightarrow \text{WorldState}_{t+1} + \text{SimulationDossier}$$
 * **Core Philosophy:**
   1. *Zero Recurring Infrastructure Cost:* Runs on GitHub Actions and GitHub Pages.
   2. *Deterministic Mechanical Core:* Pure Python handles dice rolls, spark tables, posture shifts, and validation gates without network or LLM dependencies.
-  3. *Strict Epistemic Grounding:* The Grounding / Linter Gate strictly prevents LLM hallucinations from introducing ungrounded canon facts or invalid voter shifts.
+  3. *Strict Epistemic Grounding:* The Grounding / Linter Gate strictly prevents LLM hallucinations from introducing ungrounded facts or invalid voter shifts.
   4. *Air-Gapped Access Control:* Workflow passcode fail-gate, Personal Access Token (PAT) client storage, and concurrency locks prevent unauthorized spend.
+  5. *Umpire Trajectory Exploration:* Empowers the human simulation umpire to inspect emergent complications, institutional friction, and counter-realities across stochastic runs.
 
 ## 2. Specification & Governance Protocols
 
