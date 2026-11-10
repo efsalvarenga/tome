@@ -81,7 +81,7 @@ The two entry values and the independently rolled Obvious/Option/Odd tier form t
 
 The engine records the two cues in selection order as `spark_tags`, each formatted `<TableName>:<entry>`, and passes them together with the tier to the proposal generator. No table is assigned to a particular tier.
 
-$d66$ notation is standard tabletop die-rolling: two six-sided dice are rolled where the first represents the tens digit and the second represents the units digit ($10 \times \text{die}_1 + \text{die}_2$), producing 36 discrete values from 11 through 66.
+$d66$ uses one-based senary (base-six) notation: two digits, each from 1 to 6, identify one of 36 table entries.
 
 ### 2.3 Engle Matrix Game Formulation
 
