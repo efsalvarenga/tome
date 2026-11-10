@@ -14,7 +14,7 @@
 
 | Spec Version | Summary |
 | :--- | :--- |
-| 1.1.0 | Revision under human review: standardized TriO naming and actor terminology across prose and contract identifiers; replaced step-dice and persistent actor posture with a per-turn d6 posture; defined built-in default spark tables with optional complete caller overrides and two tables selected randomly each turn, independently of tier; simplified resolution to 2d6 plus peer votes against 7+; removed mechanical trackers, exhaustion, boons, and outcome bands. Narrative traits remain reusable grounding references. The interface contract remains a 1.0.0 draft pending approval. |
+| 1.1.0 | Revision under human review: standardized TriO naming and actor terminology across prose and contract identifiers; replaced step-dice and persistent actor posture with a per-turn d6 posture; defined built-in default spark tables with optional complete caller overrides and two tables selected randomly each turn, independently of tier; simplified resolution to 2d6 plus peer votes against 7+; removed mechanical trackers, exhaustion, boons, and outcome bands. Deferred actor traits; only `canon_facts` provides grounding references. The interface contract remains a 1.0.0 draft pending approval. |
 | 1.0.0 | Retained the engine mechanics and defined a transport-neutral multi-turn execution contract. Removed UI, hosting, authentication, deployment, persistence, and provider-selection requirements from the active scope. |
 
 #### Deferred UI / Execution-Bridge Scope
@@ -34,8 +34,8 @@ $$\mathcal{M}(\text{WorldState}_{t}, \text{RunRequest}) \longrightarrow (\text{W
 ### Goals
 
 * **Deterministic Mechanical Core:** Each turn uses a d6 for posture (1-3 Obvious, 4-5 Option, 6 Odd), d66 lookups on two randomly selected tables independently of posture, and 2d6 plus peer votes against target number 7. Tables come from built-in defaults or a complete caller override. A supplied seed fixes the engine-controlled random sequence for the same engine/runtime version.
-* **Narrative-Only Trackers:** Actor conditions and capabilities are narrative facts and traits, not mechanical meters. There are no persistent posture levels, trait exhaustion, recovery, or automatic bonuses from trackers. Turn and round counters record simulation time only.
-* **Strict Epistemic Grounding (The Linter Gate):** Proposal generators and peer reviewers cannot introduce ungrounded setting details or arbitrary voting shifts. Grounding checks enforce whitespace-stripped exact matching against existing `canon_facts` or intrinsic actor `traits`.
+* **Narrative-Only Trackers:** Actor conditions and capabilities are narrative facts, not mechanical meters. There are no persistent posture levels, consumable capability pools, recovery mechanics, or automatic bonuses from trackers. Turn and round counters record simulation time only.
+* **Strict Epistemic Grounding (The Linter Gate):** Proposal generators and peer reviewers cannot introduce ungrounded setting details or arbitrary voting shifts. Grounding checks enforce whitespace-stripped exact matching against existing `canon_facts` only.
 * **Transport-Neutral Execution Contract:** Define versioned input, output, turn-order, validation, and failure semantics without prescribing a UI, transport, hosting provider, or persistence mechanism.
 * **Isolated Provider Boundary:** Proposal generation and peer review may be supplied by engine-side adapters; this specification does not select an LLM provider or expose provider credentials through the contract.
 
@@ -63,7 +63,7 @@ Every actor uses the same d6 to select a posture for its current turn:
 
 | d6 Roll | Posture | Meaning |
 | :---: | :--- | :--- |
-| 1-3 | Obvious | A predictable initiative given the actor's narrative traits and agenda. |
+| 1-3 | Obvious | A predictable initiative given established canon and the actor's agenda. |
 | 4-5 | Option | A lateral but strategically logical initiative. |
 | 6 | Odd | An atypical, radical, or unexpected initiative. |
 
@@ -77,7 +77,7 @@ If `RunRequest.spark_tables` is omitted, the engine uses those defaults. A calle
 
 For each turn, the engine selects two distinct tables uniformly at random from those five, independently of the TriO tier. It rolls one d66 entry from each selected table. Table selection is fresh on every turn, so a table may be used again on later turns.
 
-The two entry values and the independently rolled Obvious/Option/Odd tier form the actor's narrative starting cues for proposing a contribution to the changed state. They are not established facts, supporting evidence, or numeric modifiers. The proposal must still ground its supporting arguments in existing canon or the actor's traits.
+The two entry values and the independently rolled Obvious/Option/Odd tier form the actor's narrative starting cues for proposing a contribution to the changed state. They are not established facts, supporting evidence, or numeric modifiers. The proposal must still ground its supporting arguments in existing `canon_facts`.
 
 The engine records the two cues in selection order as `spark_tags`, each formatted `<TableName>:<entry>`, and passes them together with the tier to the proposal generator. No table is assigned to a particular tier.
 
@@ -87,21 +87,21 @@ $d66$ uses one-based senary (base-six) notation: two digits, each from 1 to 6, i
 
 A proposal is a structured argument:
 * **World-Change Statement:** A single declarative assertion specifying an altered fact in the world benefiting the active actor.
-* **Supporting Arguments (Pros):** 1 to 2 arguments explicitly grounded in existing `canon_facts` or the actor's own `traits`.
+* **Supporting Arguments (Pros):** 1 to 2 arguments explicitly grounded in existing `canon_facts`.
 
-### 2.4 Peer Review & The Cheeky Pivot
+### 2.4 Peer Review & Vote Adjustment
 
 Every non-active actor evaluates the proposal as an independent adjudicator:
 1. **Baseline Plausibility:** Rate proposal as $+1$ (Plausible), $0$ (Uncertain), or $-1$ (Implausible).
 2. **Strategic Alignment:** Describe whether the outcome is `beneficial`, `neutral`, or `hostile` to the voter. This is narrative metadata, not an additional mechanical constraint on vote direction.
-3. **The Cheeky Pivot (Biased Shift):** May shift the final vote by at most $\pm 1$ step from baseline. The resulting `final_vote` is clamped to $[-1, +1]$:
+3. **Vote Adjustment:** May shift the final vote by at most $\pm 1$ step from baseline. The resulting `final_vote` is clamped to $[-1, +1]$:
    * $+1 \to +1$ (unaltered beneficial)
    * $+1 \to 0$ (hostile shift down)
    * $0 \to -1$ (hostile shift down)
    * $-1 \to 0$ (beneficial shift up)
    * $0 \to +1$ (beneficial shift up)
    * An individual voter's `final_vote` is strictly bounded within $\{-1, 0, +1\}$.
-4. **The Grounding Gate:** If a shift is attempted ($\text{shift} \neq 0$), the voter MUST cite a valid anchor from `canon_facts` or its own narrative `traits`. If the anchor is missing or invalid, the vote reverts to baseline. Facts and traits are reusable references: citing one does not consume, exhaust, or mechanically change it.
+4. **The Grounding Gate:** If a shift is attempted ($\text{shift} \neq 0$), the voter MUST cite a valid anchor from `canon_facts`. If the anchor is missing or invalid, the vote reverts to baseline. Facts are reusable references: citing one does not consume or mechanically change it.
 
 The numeric difference between final vote and baseline determines whether a shift was attempted; the adapter's `biased_shift_applied` flag does not authorize or prevent one. After validation, the engine sets that flag to whether a valid non-zero shift remains. Invalid shifts revert to baseline with the flag false and anchor null; unchanged votes also have the flag false and anchor null. Valid shifted votes retain the normalized anchor. `goal_alignment` remains descriptive for all three values.
 
@@ -116,7 +116,7 @@ Resolution roll: $2d6 + \text{Net Modifier}$ against target number 7:
 | **7+** | **Success** | Append the proposal's world-change statement to `canon_facts` if not already present. |
 | **Below 7** | **Failure** | The proposed change does not enter canon. Record the attempt and rationale without adding facts, rumors, complications, or counter-facts. |
 
-There are no critical success/failure bands or secondary boons. Peer arguments inform the modifier and remain in the audit record; they do not automatically become facts. `active_rumors`, actor traits, and all other narrative state remain unchanged by resolution. Every resolved turn advances time regardless of success or failure.
+There are no critical success/failure bands or secondary boons. Peer arguments inform the modifier and remain in the audit record; they do not automatically become facts. `active_rumors`, actor records, and all other narrative state remain unchanged by resolution. Every resolved turn advances time regardless of success or failure.
 
 ---
 
@@ -149,15 +149,11 @@ All listed fields are required except fields explicitly marked optional elsewher
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "name", "agenda", "traits"],
+        "required": ["id", "name", "agenda"],
         "properties": {
           "id": { "type": "string", "minLength": 1 },
           "name": { "type": "string" },
-          "agenda": { "type": "string" },
-          "traits": {
-            "type": "array",
-            "items": { "type": "string" }
-          }
+          "agenda": { "type": "string" }
         }
       }
     }
@@ -165,13 +161,13 @@ All listed fields are required except fields explicitly marked optional elsewher
 }
 ```
 
-For every actor, `id` must be non-empty and unique in the world state. `traits` contains narrative descriptions, not consumable capabilities. Actors have no persistent `posture` or `exhausted_traits` fields. Legacy payloads containing removed fields must be adapted by the caller; undeclared fields reject the run as `InvalidRunRequestError`.
+For every actor, `id` must be non-empty and unique in the world state. Actor traits are deferred from this revision; actors contain only `id`, `name`, and `agenda`. Name and agenda supply narrative context, not grounding evidence. Actor capabilities or conditions may be cited only if stated in `canon_facts`. Legacy payloads containing deferred or removed fields must be adapted by the caller; undeclared fields reject the run as `InvalidRunRequestError`.
 
 ### 3.2 Proposal Contract (Stage 3)
 
 ```text
 SupportingPro = {
-  source_type: "actor_trait" | "canon_fact",
+  source_type: "canon_fact",
   source_ref: string,
   argument: string
 }
@@ -194,17 +190,12 @@ Proposal = {
   "posture_roll": 6,
   "trio_tier": "Odd",
   "spark_tags": ["Focus:Resource access", "Method:Public declaration"],
-  "world_change_statement": "The Iron Choir establishes a fortified scrap blockade across Conduit 4, redirecting geothermal power exclusively to their foundries.",
+  "world_change_statement": "The Iron Choir claims the conduit.",
   "supporting_pros": [
     {
-      "source_type": "actor_trait",
-      "source_ref": "Sub-Surface Conduit Maps",
-      "argument": "Their navigation charts permit precise bypass and isolation of auxiliary conduits."
-    },
-    {
       "source_type": "canon_fact",
-      "source_ref": "The Iron Foundry in Sector 4 was destroyed.",
-      "argument": "The regional power grid is already destabilized, creating an exploitable energy vacuum."
+      "source_ref": "The conduit is open.",
+      "argument": "The open conduit gives the Iron Choir access."
     }
   ]
 }
@@ -230,9 +221,9 @@ PeerEvaluation = {
   "baseline_plausibility": 1,
   "goal_alignment": "hostile",
   "biased_shift_applied": true,
-  "cited_anchor": "Harbor quarantine is active until winter.",
+  "cited_anchor": "The conduit is open.",
   "final_vote": 0,
-  "public_argument": "While their conduit access is uncontested, the harbor quarantine restricts industrial distribution, meaning diverted geothermal power will quickly overheat local distribution coils."
+  "public_argument": "The conduit is open, but that does not establish exclusive control."
 }
 ```
 
@@ -323,14 +314,12 @@ The complete example below demonstrates an override using illustrative caller-su
       {
         "id": "actor_iron_choir",
         "name": "Iron Choir",
-        "agenda": "Control the conduit",
-        "traits": ["Scrap mastery"]
+        "agenda": "Control the conduit"
       },
       {
         "id": "actor_dock_syndicate",
         "name": "Dock Syndicate",
-        "agenda": "Protect trade",
-        "traits": ["Harbor control"]
+        "agenda": "Protect trade"
       }
     ]
   },
@@ -403,14 +392,12 @@ The successful result contains the complete final world state and exactly one or
       {
         "id": "actor_iron_choir",
         "name": "Iron Choir",
-        "agenda": "Control the conduit",
-        "traits": ["Scrap mastery"]
+        "agenda": "Control the conduit"
       },
       {
         "id": "actor_dock_syndicate",
         "name": "Dock Syndicate",
-        "agenda": "Protect trade",
-        "traits": ["Harbor control"]
+        "agenda": "Protect trade"
       }
     ]
   },
@@ -503,7 +490,7 @@ PeerReviewer(
 
 The proposal generator returns only a `ProposalDraft`; the engine creates the complete `Proposal` by attaching the active actor ID, posture die and roll, tier, and spark tags already resolved for that turn. Each adapter must return the declared schema and must not mutate its arguments. The runner supplies isolated snapshots of the current state and proposal. Provider/network errors or malformed output become `ProposalGenerationError` or `PeerReviewError`. The engine applies grounding and voting validation to returned values. It prunes ungrounded proposal pros; if no grounded pro remains, it raises `InvalidProposalError` without automatically retrying. Any adapter retry policy is outside the engine contract. Engine errors expose the stable code and message represented by `RunFailure`; an execution bridge maps those values into its chosen transport response without returning partial state.
 
-The generator receives the TriO tier and both selected spark tags together as the narrative starting cues. It must not replace the sampled tables with a tier-specific pair or treat their entries as grounding evidence. The active actor and current world state provide the context and permitted grounding references.
+The generator receives the TriO tier and both selected spark tags together as the narrative starting cues. It must not replace the sampled tables with a tier-specific pair or treat their entries as grounding evidence. The active actor and current world state provide narrative context; only `canon_facts` provides grounding references.
 
 An empty or whitespace-only world-change statement is malformed proposal output and raises `ProposalGenerationError` before adjudication; it must never enter canon. Non-blank statements retain their original text.
 
@@ -513,10 +500,10 @@ An empty or whitespace-only world-change statement is malformed proposal output 
 
 * **Invariant 1 (Run Turn Order):** The caller may supply `first_round_order`, which must be a permutation of all actor IDs. If omitted, the engine creates a random permutation; a supplied seed makes that order reproducible. This order remains fixed and repeats until the requested turns are complete. Every new `RunRequest` starts at the beginning of its own order; partial rounds are not resumed across requests.
 * **Invariant 2 (Per-Turn Posture):** Every turn rolls one d6: 1-3 means Obvious, 4-5 means Option, and 6 means Odd. The selected posture is turn-local; no actor condition changes this mapping.
-* **Invariant 3 (Cheeky Pivot Shift Limit & Bounds):** A peer evaluation shift $(\text{final\_vote} - \text{baseline\_plausibility})$ cannot exceed $\pm 1$. Any deviation $> 1$ or $< -1$ is invalid and reverts to baseline. Both `baseline_plausibility` and `final_vote` are strictly constrained to $\{-1, 0, +1\}$.
-* **Invariant 4 (Grounding Gate Validity):** Any non-zero vote shift $(\text{shift} \neq 0)$ requires `cited_anchor` (after stripping whitespace and enclosing quotation marks) to match exactly an existing string in `canon_facts` or the voter actor's `traits`. If ungrounded, the shift is discarded and `final_vote` reverts to `baseline_plausibility`. Valid anchors remain reusable across turns.
-* **Invariant 5 (Proposal Pro Grounding Gate):** Each entry in `supporting_pros` must validate its `source_ref` against the declared `source_type`: if `canon_fact`, it must match a known canon fact; if `actor_trait`, it must match one of the active actor's own traits. Ungrounded pros are pruned. The proposal proceeds only if at least 1 grounded pro remains; otherwise, the run fails with `InvalidProposalError` and the engine does not regenerate the proposal.
-* **Invariant 6 (Narrative-Only Trackers):** Traits, rumors, and actor conditions carry narrative information only. They are not consumed, recovered, stepped, or used as automatic numeric modifiers. Grounded peer votes are the only adjustment to the resolution roll.
+* **Invariant 3 (Vote Adjustment Limits & Bounds):** A peer evaluation shift $(\text{final\_vote} - \text{baseline\_plausibility})$ cannot exceed $\pm 1$. Any deviation $> 1$ or $< -1$ is invalid and reverts to baseline. Both `baseline_plausibility` and `final_vote` are strictly constrained to $\{-1, 0, +1\}$.
+* **Invariant 4 (Grounding Gate Validity):** Any non-zero vote shift $(\text{shift} \neq 0)$ requires `cited_anchor` (after stripping whitespace and enclosing quotation marks) to match exactly an existing string in `canon_facts`. If ungrounded, the shift is discarded and `final_vote` reverts to `baseline_plausibility`. Valid anchors remain reusable across turns.
+* **Invariant 5 (Proposal Pro Grounding Gate):** Each entry in `supporting_pros` must use `source_type: "canon_fact"` and its normalized `source_ref` must match a known canon fact. Ungrounded pros are pruned. The proposal proceeds only if at least 1 grounded pro remains; otherwise, the run fails with `InvalidProposalError` and the engine does not regenerate the proposal.
+* **Invariant 6 (Narrative-Only Trackers):** Rumors and actor conditions carry narrative information only. They are not consumed, recovered, stepped, or used as automatic numeric modifiers. Grounded peer votes are the only adjustment to the resolution roll.
 * **Invariant 7 (Binary Resolution):** An adjusted total of 7 or more is Success; a lower total is Failure. Success appends the world-change statement to canon only if absent. Failure introduces no narrative changes. Neither outcome adds rumors or peer arguments to canon automatically.
 * **Invariant 8 (Net Modifier Clamping):** The sum of final peer votes is clamped to $[-3, +3]$ inclusive before rolling $2d6$.
 * **Invariant 9 (Time Always Advances):** Success and Failure both resolve the turn and advance its time counter. A failed attempt is not an engine error and remains in `turn_records`.
@@ -544,8 +531,8 @@ The engine accepts a `RunRequest` as defined in Section 3.4: a complete `WorldSt
 3. Execute exactly `turn_count` turns, advancing through the order and restarting at its first actor after each complete pass:
    a. Roll one posture d6 and map it to Obvious/Option/Odd. Independently sample two distinct tables, roll one d66 entry from each, and construct their spark tags in selection order.
    b. Generate a `ProposalDraft` through the engine-side proposal-generation integration; the engine attaches the already-resolved active actor ID, posture die/roll, tier, and spark tags to form the `Proposal`.
-   c. Validate and prune proposal pros against canon facts and active-actor traits; if none remain, fail with `InvalidProposalError`.
-   d. Obtain one peer evaluation from every non-active actor, then apply shift and grounding validation without consuming any trait or fact.
+   c. Validate and prune proposal pros against `canon_facts` only; if none remain, fail with `InvalidProposalError`.
+   d. Obtain one peer evaluation from every non-active actor, then apply shift and canon-fact grounding validation without consuming any fact.
    e. Clamp the sum of final votes to $[-3, +3]$, roll 2d6, and add the modifier.
    f. If the adjusted total is at least 7, record Success and append the proposal statement to canon if absent. Otherwise record Failure and leave narrative state unchanged. Do not generate automatic rumors, complications, boons, or counter-facts.
    g. Increment `turn_index`. If every actor in the fixed run order has acted, increment `session_index`. Record the proposal, evaluations, roll, modifier, Success/Failure, and end-of-turn state delta in a `TurnRecord`.
@@ -561,8 +548,8 @@ The successful output is the versioned `RunResult` in Section 3.4. The engine do
 
 ## 6. Edge Cases & Failure Modes
 
-* **Edge Case 1: Repeated Trait Citations:** The same fact or voter trait may ground multiple turns. Citations neither consume references nor create tracker state.
-* **Edge Case 2: Hallucinated Anchor Strings:** Peer reviews might include leading/trailing whitespace or enclosing quotes. The linter gate strips outer whitespace and one matching enclosing quote pair before checking exact membership. If not found in `canon_facts` or voter `traits`, the shift is reverted.
+* **Edge Case 1: Repeated Fact Citations:** The same canon fact may ground multiple turns. Citations neither consume references nor create tracker state.
+* **Edge Case 2: Hallucinated Anchor Strings:** Peer reviews might include leading/trailing whitespace or enclosing quotes. The linter gate strips outer whitespace and one matching enclosing quote pair before checking exact membership. If not found in `canon_facts`, the shift is reverted.
 * **Edge Case 3: One Actor:** A one-actor run is valid; it has no peer evaluations, so the net modifier is $0$. The one-actor order completes a round on every turn.
 * **Edge Case 4: Resolution Boundaries:** Total 6 fails; total 7 succeeds. Higher and lower totals have no additional effects. An already-present statement is not duplicated on success. A failed roll still produces a turn record and advances time.
 * **Edge Case 5: Invalid Run Request:** A non-positive `turn_count`, negative seed, empty actor set, duplicate/empty actor ID, undeclared tracker field, or `first_round_order` that is not an exact permutation is rejected with `InvalidRunRequestError` before execution. The caller's input state remains untouched.
@@ -582,16 +569,16 @@ The successful output is the versioned `RunResult` in Section 3.4. The engine do
 * **Spark Table Defaults and Overrides:** Assert omitted `spark_tables` selects `trio-d66-v1`; valid complete overrides produce exact supplied `<TableName>:<entry>` tags and source `request`. Reject null payloads, missing/extra table names or d66 keys, and non-string/blank entries without falling back to defaults. Table-source selection must not consume RNG draws or alter the table-sampling procedure.
 * **Narrative Spark Selection:** Assert each turn selects two distinct tables, all ten unordered pairs are eligible under all three tiers, and later turns may reuse tables. Verify the generator receives both entries and the tier together; sparks alone cannot ground supporting arguments or vote shifts.
 * **Linter Gate Shift Bounds:** Assert shifts of $\pm 2$ are rejected and reverted to baseline. Assert `final_vote` values strictly stay within $\{-1, 0, +1\}$.
-* **Grounding Gate Verification:** Assert valid canon facts and valid voter traits allow shifts; nonexistent strings cause reversion to baseline. Assert the same valid reference can be reused on later turns without mutation.
+* **Grounding Gate Verification:** Assert only canon facts ground supporting arguments and shifted votes. Nonexistent strings, actor metadata, and spark entries do not qualify unless independently present in `canon_facts`. Assert the same canon fact can be reused on later turns without mutation.
 * **Proposal and Evaluation Schemas:** Assert adapter output validation, engine attachment of turn mechanics to `ProposalDraft`, and one ordered peer evaluation per non-active actor.
 * **Voting Metadata:** Assert alignment is descriptive and normalized shift flags/anchors follow the numeric shift and grounding checks, including inconsistent adapter flags.
 * **Closed State Schema:** Assert unknown fields are rejected at both world-state and actor-object levels.
 * **Non-Blank Proposals:** Reject empty and whitespace-only statements before any resolution roll or canon insertion.
 * **Net Modifier Clamping:** Assert extreme positive and negative vote sums clamp strictly at $[-3, +3]$.
 * **Binary Resolution:** Assert adjusted totals 6 and 7 resolve to Failure and Success respectively; all totals below 7 behave alike and all totals at least 7 behave alike. Only successful proposals enter canon, without duplicates. Failures still advance time and emit records.
-* **Narrative State Preservation:** Assert resolution never automatically changes rumors, actors, or traits; no posture, exhaustion, recovery, boon, complication, or counter-fact is created.
+* **Narrative State Preservation:** Assert resolution never automatically changes rumors or actor records; no posture, exhaustion, recovery, boon, complication, or counter-fact is created.
 * **State-Change Records:** Assert each changed top-level field appears once, sorted by ascending JSON Pointer, with before/after values and deterministic reason text.
-* **Removed Tracker Fields:** Reject legacy persistent posture and exhaustion fields as undeclared fields.
+* **Deferred and Removed Actor Fields:** Reject actor traits and legacy persistent posture/exhaustion fields as undeclared fields; reject `actor_trait` as a supporting argument's source type.
 
 ### Integration Tests
 
@@ -602,7 +589,7 @@ The successful output is the versioned `RunResult` in Section 3.4. The engine do
 
 ## 8. Goldfish Review Gates
 
-The [Goldfish review report](../reviews/001_tome_core_architecture_review.md) records the historical 1.0.0 approval and findings on an earlier 1.1.0 draft. Human review subsequently changed actor terminology and the spark-table contract. Independent review of the current draft and human approval remain pending.
+The [Goldfish review report](../reviews/001_tome_core_architecture_review.md) records the historical 1.0.0 approval and findings on an earlier 1.1.0 draft. Human review subsequently changed actor terminology, the spark-table contract, and grounding scope. Independent review of the current draft and human approval remain pending.
 
 - [ ] Zero-context Goldfish review completed for the current Spec Version 1.1.0 draft
 - [ ] Goldfish confirmation of corrected contract gaps for Spec Version 1.1.0
