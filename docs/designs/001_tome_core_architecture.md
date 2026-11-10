@@ -5,7 +5,7 @@
 | Metadata | Value |
 | :--- | :--- |
 | Spec Version | 1.1.0 |
-| Interface Contract Version | 1.0.0 |
+| Interface Contract Version | 1.1.0 |
 | Status | Under Review |
 | Author | Elephant Agent & Developer |
 | Target Milestone | v0.1.0 (Core Engine & Pure-Python Mechanics) |
@@ -14,7 +14,7 @@
 
 | Spec Version | Summary |
 | :--- | :--- |
-| 1.1.0 | Revision under human review: standardized TriO and actor terminology; replaced persistent posture and step-dice with a per-turn d6; provided default spark tables with complete caller overrides and tier-independent random selection; simplified resolution to 2d6 plus peer votes against 7+; deferred actor traits and retained canon-only grounding; removed mechanical trackers, exhaustion, boons, and outcome bands; added optional pre-roll umpire rejection of illogical shifts and mandatory umpire resolution of failures into new canon consequences based on the lowest final peer votes; retained interface contract 1.0.0 as a draft pending approval. |
+| 1.1.0 | Revision under human review: standardized TriO and actor terminology; replaced persistent posture and step-dice with a per-turn d6; provided default spark tables with complete caller overrides and tier-independent random selection; simplified resolution to 2d6 plus peer votes against 7+; deferred actor traits and retained canon-only grounding; removed mechanical trackers, exhaustion, boons, and outcome bands; added optional pre-roll umpire rejection of illogical shifts and mandatory umpire resolution of failures into new canon consequences based on the lowest final peer votes; bumped the interface contract to 1.1.0 for the changed actor schema, binary outcome, umpire callbacks, and `failure_resolution`/`umpire_rejections` records, as a draft pending approval. |
 | 1.0.0 | Retained the engine mechanics and defined a transport-neutral multi-turn execution contract. Removed UI, hosting, authentication, deployment, persistence, and provider-selection requirements from the active scope. |
 
 #### Deferred UI / Execution-Bridge Scope
@@ -277,7 +277,7 @@ The interface types are:
 
 ```text
 RunRequest = {
-  contract_version: "1.0.0",
+  contract_version: "1.1.0",
   world_state: WorldState,
   turn_count: integer where turn_count >= 1,
   spark_tables?: SparkTables,
@@ -286,7 +286,7 @@ RunRequest = {
 }
 
 RunResult = {
-  contract_version: "1.0.0",
+  contract_version: "1.1.0",
   final_world_state: WorldState,
   spark_table_source: "trio-d66-v1" | "request",
   turn_records: TurnRecord[] where length == RunRequest.turn_count
@@ -352,7 +352,7 @@ RunError =
   MechanicsError
 
 RunFailure = {
-  contract_version: "1.0.0",
+  contract_version: "1.1.0",
   code: "INVALID_RUN_REQUEST" | "PROPOSAL_GENERATION_FAILED" |
         "INVALID_PROPOSAL" | "PEER_REVIEW_FAILED" | "UMPIRE_REVIEW_FAILED" |
         "UMPIRE_RESOLUTION_FAILED" | "MECHANICS_FAILED",
@@ -368,7 +368,7 @@ The complete example below demonstrates an override using illustrative caller-su
 
 ```json
 {
-  "contract_version": "1.0.0",
+  "contract_version": "1.1.0",
   "world_state": {
     "session_index": 0,
     "turn_index": 0,
@@ -443,7 +443,7 @@ In this example, the base roll of 7 receives a -1 peer modifier, so the proposal
 
 ```json
 {
-  "contract_version": "1.0.0",
+  "contract_version": "1.1.0",
   "spark_table_source": "request",
   "final_world_state": {
     "session_index": 0,
