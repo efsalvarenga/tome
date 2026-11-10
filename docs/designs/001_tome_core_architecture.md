@@ -14,7 +14,7 @@
 
 | Spec Version | Summary |
 | :--- | :--- |
-| 1.1.0 | Revision under human review: standardized TriO naming and actor terminology across prose and contract identifiers; replaced step-dice and persistent actor posture with a per-turn d6 posture; defined built-in default spark tables with optional complete caller overrides and two tables selected randomly each turn, independently of tier; simplified resolution to 2d6 plus peer votes against 7+; removed mechanical trackers, exhaustion, boons, and outcome bands. Deferred actor traits; only `canon_facts` provides grounding references. The interface contract remains a 1.0.0 draft pending approval. |
+| 1.1.0 | Revision under human review: standardized TriO naming and actor terminology across prose and contract identifiers; replaced step-dice and persistent actor posture with a per-turn d6 posture; defined built-in default spark tables with optional complete caller overrides and two tables selected randomly each turn, independently of tier; simplified resolution to 2d6 plus peer votes against 7+; removed mechanical trackers, exhaustion, boons, and outcome bands. Deferred actor traits; only `canon_facts` provides grounding references. Added optional human-umpire rejection of illogical vote shifts before resolution, with an audit trail. The interface contract remains a 1.0.0 draft pending approval. |
 | 1.0.0 | Retained the engine mechanics and defined a transport-neutral multi-turn execution contract. Removed UI, hosting, authentication, deployment, persistence, and provider-selection requirements from the active scope. |
 
 #### Deferred UI / Execution-Bridge Scope
@@ -35,7 +35,7 @@ $$\mathcal{M}(\text{WorldState}_{t}, \text{RunRequest}) \longrightarrow (\text{W
 
 * **Deterministic Mechanical Core:** Each turn uses a d6 for posture (1-3 Obvious, 4-5 Option, 6 Odd), d66 lookups on two randomly selected tables independently of posture, and 2d6 plus peer votes against target number 7. Tables come from built-in defaults or a complete caller override. A supplied seed fixes the engine-controlled random sequence for the same engine/runtime version.
 * **Narrative-Only Trackers:** Actor conditions and capabilities are narrative facts, not mechanical meters. There are no persistent posture levels, consumable capability pools, recovery mechanics, or automatic bonuses from trackers. Turn and round counters record simulation time only.
-* **Strict Epistemic Grounding (The Linter Gate):** Proposal generators and peer reviewers cannot introduce ungrounded setting details or arbitrary voting shifts. Grounding checks enforce whitespace-stripped exact matching against existing `canon_facts` only.
+* **Strict Epistemic Grounding (The Linter Gate):** Proposal generators and peer reviewers cannot introduce ungrounded setting details or arbitrary voting shifts. Citation checks enforce whitespace-stripped exact matching against existing `canon_facts` only; they do not prove that the argument is logical. The human umpire may reject illogical vote shifts through an optional pre-resolution review callback.
 * **Transport-Neutral Execution Contract:** Define versioned input, output, turn-order, validation, and failure semantics without prescribing a UI, transport, hosting provider, or persistence mechanism.
 * **Isolated Provider Boundary:** Proposal generation and peer review may be supplied by engine-side adapters; this specification does not select an LLM provider or expose provider credentials through the contract.
 
@@ -55,7 +55,7 @@ $$\mathcal{M}(\text{WorldState}_{t}, \text{RunRequest}) \longrightarrow (\text{W
 
 The engine contract describes values and behavior, not a transport. A caller submits a complete `WorldState` and a run request, and receives a completed `RunResult`. The caller is responsible for transport, authorization, persistence, and presenting results. A UI or execution bridge may use synchronous calls, asynchronous jobs, or another mechanism without changing this contract.
 
-The engine-side integration supplies proposal-generation and peer-review implementations through the adapters in Section 3.5. Their provider, model, credentials, and retry policy are not part of the caller-facing contract. Mechanics, validation, turn ordering, state transitions, and result records remain governed by this specification.
+The engine-side integration supplies proposal-generation and peer-review implementations through the adapters in Section 3.5. The caller may also supply an optional umpire-review callback to apply the human user's decisions before resolution. These callables are not serialized into `RunRequest`; collecting user input, provider selection, credentials, and transport remain outside this contract. Mechanics, validation, turn ordering, state transitions, and result records remain governed by this specification.
 
 ### 2.1 Per-Turn d6 Posture
 
@@ -101,9 +101,11 @@ Every non-active actor evaluates the proposal as an independent adjudicator:
    * $-1 \to 0$ (beneficial shift up)
    * $0 \to +1$ (beneficial shift up)
    * An individual voter's `final_vote` is strictly bounded within $\{-1, 0, +1\}$.
-4. **The Grounding Gate:** If a shift is attempted ($\text{shift} \neq 0$), the voter MUST cite a valid anchor from `canon_facts`. If the anchor is missing or invalid, the vote reverts to baseline. Facts are reusable references: citing one does not consume or mechanically change it.
+4. **Grounding & Umpire Review:** If a shift is attempted ($\text{shift} \neq 0$), the voter MUST cite a valid anchor from `canon_facts`. If the anchor is missing or invalid, or the human umpire (the user of the engine) deems the reasoning for the shift illogical, the vote reverts to baseline. Citation validity is checked mechanically; logical rejection is the umpire's decision, not an automatic engine judgement. Facts are reusable references: citing one does not consume or mechanically change it.
 
-The numeric difference between final vote and baseline determines whether a shift was attempted; the adapter's `biased_shift_applied` flag does not authorize or prevent one. After validation, the engine sets that flag to whether a valid non-zero shift remains. Invalid shifts revert to baseline with the flag false and anchor null; unchanged votes also have the flag false and anchor null. Valid shifted votes retain the normalized anchor. `goal_alignment` remains descriptive for all three values.
+The numeric difference between final vote and baseline determines whether a shift was attempted; the adapter's `biased_shift_applied` flag does not authorize or prevent one. After mechanical validation and any umpire review, the engine sets that flag to whether a non-zero shift remains. Invalid or umpire-rejected shifts revert to baseline with the flag false and anchor null; unchanged votes also have the flag false and anchor null. Remaining shifted votes retain the normalized anchor. `goal_alignment` remains descriptive for all three values.
+
+Correctly cited shifts proceed unless the umpire rejects them through the optional callback in Section 3.5. There is no mandatory approval pause when that callback is absent. Rejections are applied before summing votes or rolling resolution dice; they restore `baseline_plausibility`, not a new vote chosen by the umpire. The original evaluation and the umpire's reason are retained in the turn record.
 
 ### 2.5 Matrix Adjudication & State Mutation
 
@@ -267,6 +269,7 @@ TurnRecord = {
   active_actor_id: string,
   proposal: Proposal,
   peer_evaluations: PeerEvaluation[],
+  umpire_rejections: UmpireRejectionRecord[],
   net_vote_modifier: integer in [-3, 3],
   resolution_roll: integer in [2, 12],
   adjusted_total: integer in [-1, 15],
@@ -281,17 +284,30 @@ StateChange = {
   reason: string                       // deterministic rule-based explanation
 }
 
+UmpireRejection = {
+  voter_actor_id: string,
+  reason: non-whitespace string
+}
+
+UmpireRejectionRecord = {
+  voter_actor_id: string,
+  reason: non-whitespace string,
+  evaluation_before_reversion: PeerEvaluation
+}
+
 RunError =
   InvalidRunRequestError |
   ProposalGenerationError |
   InvalidProposalError |
   PeerReviewError |
+  UmpireReviewError |
   MechanicsError
 
 RunFailure = {
   contract_version: "1.0.0",
   code: "INVALID_RUN_REQUEST" | "PROPOSAL_GENERATION_FAILED" |
-        "INVALID_PROPOSAL" | "PEER_REVIEW_FAILED" | "MECHANICS_FAILED",
+        "INVALID_PROPOSAL" | "PEER_REVIEW_FAILED" | "UMPIRE_REVIEW_FAILED" |
+        "MECHANICS_FAILED",
   message: string
 }
 ```
@@ -432,6 +448,7 @@ The successful result contains the complete final world state and exactly one or
           "public_argument": "The Dock Syndicate remains uncertain."
         }
       ],
+      "umpire_rejections": [],
       "net_vote_modifier": 0,
       "resolution_roll": 7,
       "adjusted_total": 7,
@@ -458,15 +475,15 @@ The successful result contains the complete final world state and exactly one or
 }
 ```
 
-Each `turn_record` preserves the proposal and its grounded pros, its `trio_tier`, its two selected table names/entry values in `spark_tags`, all peer evaluations after grounding validation, the clamped net vote modifier, resolution roll and adjusted total, success or failure, and the state changes applied by that turn. It is an audit record of why the final state changed; it is not a UI-formatted dossier.
+Each `turn_record` preserves the proposal and its grounded pros, its `trio_tier`, its two selected table names/entry values in `spark_tags`, all peer evaluations after mechanical validation and any umpire rejections, the clamped net vote modifier, resolution roll and adjusted total, success or failure, and the state changes applied by that turn. `umpire_rejections` preserves the original mechanically validated evaluation and the user's reason for each rejected shift, in peer-evaluation order. An empty list means no umpire rejections were applied, not that a human approved every vote. The record explains why the final state changed; it is not a UI-formatted dossier.
 
 `peer_evaluations` contains exactly one evaluation for each non-active actor, in the order those actors appear in the input `WorldState`. `state_changes` contains each changed top-level `WorldState` field exactly once, ordered by ascending JSON Pointer. Each entry's `before` and `after` are the complete JSON values of that field; `reason` describes every deterministic engine rule that affected it, in execution order. These values represent the net change at the end of the turn, including counter updates. A completed run contains exactly `turn_count` records, including failed attempts; errors use one of the `RunError` types and never include a partial result.
 
 The proposal's `active_actor_id` must equal the actor taking the turn; its die is always `d6`, its roll is the engine's turn-local posture roll, and its tier must match that roll. Its two spark tags must match the d66 entries from the independently selected distinct tables in selection order, not a tier-specific pairing. Each peer evaluation's voter ID must identify a distinct non-active actor. A caller-supplied state must contain every field in Section 3.1; actor IDs are non-empty and unique. All contract objects reject undeclared fields.
 
-### 3.5 Engine-Side Proposal and Peer-Review Adapters
+### 3.5 Engine-Side Adapters & Optional Umpire Review
 
-The runner invokes two engine-side adapters; these are not part of `RunRequest` and are not implemented by the UI:
+The runner invokes two engine-side adapters and may invoke a caller-supplied umpire-review callback. None is part of the serialized `RunRequest`; how a UI or bridge gathers the human user's decisions is outside this specification:
 
 ```text
 ProposalDraft = {
@@ -486,9 +503,22 @@ PeerReviewer(
   proposal: Proposal,
   world_state: WorldState
 ) -> PeerEvaluation
+
+UmpireReview(
+  turn_index: integer >= 1,
+  proposal: Proposal,
+  peer_evaluations: PeerEvaluation[],
+  world_state: WorldState
+) -> UmpireRejection[]
 ```
 
 The proposal generator returns only a `ProposalDraft`; the engine creates the complete `Proposal` by attaching the active actor ID, posture die and roll, tier, and spark tags already resolved for that turn. Each adapter must return the declared schema and must not mutate its arguments. The runner supplies isolated snapshots of the current state and proposal. Provider/network errors or malformed output become `ProposalGenerationError` or `PeerReviewError`. The engine applies grounding and voting validation to returned values. It prunes ungrounded proposal pros; if no grounded pro remains, it raises `InvalidProposalError` without automatically retrying. Any adapter retry policy is outside the engine contract. Engine errors expose the stable code and message represented by `RunFailure`; an execution bridge maps those values into its chosen transport response without returning partial state.
+
+If configured and at least one valid shifted vote remains after mechanical checks, the runner invokes `UmpireReview` once before computing the turn's modifier. It receives isolated snapshots of the proposal, all mechanically validated evaluations, and the pre-resolution world state. `turn_index` identifies the turn being resolved (`world_state.turn_index + 1`). The callback conveys the human umpire's decisions, not additional peer-agent votes; it must not mutate its arguments or consume the engine's RNG.
+
+The callback returns zero or more rejections, each naming a distinct voter whose vote still differs from baseline and giving the user's reason. Returning `[]` leaves votes unchanged. For each rejection, the engine records an independent copy of the pre-reversion evaluation, restores `final_vote` to `baseline_plausibility`, sets `biased_shift_applied` to false, and clears `cited_anchor`. The baseline and public argument are unchanged. The engine builds `UmpireRejectionRecord` entries itself and includes them in peer-evaluation order; peer-review providers cannot supply these records.
+
+If the callback is absent or no shifted votes remain, it is not invoked and `umpire_rejections` is empty. Duplicate/unknown voter IDs, rejection of a vote already at baseline, blank reasons, malformed output, or a callback failure/cancellation raise `UmpireReviewError` with code `UMPIRE_REVIEW_FAILED`. The engine must not silently proceed, retry, or publish a partial result on callback failure.
 
 The generator receives the TriO tier and both selected spark tags together as the narrative starting cues. It must not replace the sampled tables with a tier-specific pair or treat their entries as grounding evidence. The active actor and current world state provide narrative context; only `canon_facts` provides grounding references.
 
@@ -501,19 +531,19 @@ An empty or whitespace-only world-change statement is malformed proposal output 
 * **Invariant 1 (Run Turn Order):** The caller may supply `first_round_order`, which must be a permutation of all actor IDs. If omitted, the engine creates a random permutation; a supplied seed makes that order reproducible. This order remains fixed and repeats until the requested turns are complete. Every new `RunRequest` starts at the beginning of its own order; partial rounds are not resumed across requests.
 * **Invariant 2 (Per-Turn Posture):** Every turn rolls one d6: 1-3 means Obvious, 4-5 means Option, and 6 means Odd. The selected posture is turn-local; no actor condition changes this mapping.
 * **Invariant 3 (Vote Adjustment Limits & Bounds):** A peer evaluation shift $(\text{final\_vote} - \text{baseline\_plausibility})$ cannot exceed $\pm 1$. Any deviation $> 1$ or $< -1$ is invalid and reverts to baseline. Both `baseline_plausibility` and `final_vote` are strictly constrained to $\{-1, 0, +1\}$.
-* **Invariant 4 (Grounding Gate Validity):** Any non-zero vote shift $(\text{shift} \neq 0)$ requires `cited_anchor` (after stripping whitespace and enclosing quotation marks) to match exactly an existing string in `canon_facts`. If ungrounded, the shift is discarded and `final_vote` reverts to `baseline_plausibility`. Valid anchors remain reusable across turns.
+* **Invariant 4 (Grounding & Umpire Rejection):** Any non-zero vote shift $(\text{shift} \neq 0)$ requires `cited_anchor` (after stripping whitespace and enclosing quotation marks) to match exactly an existing string in `canon_facts`. A missing/invalid anchor or human-umpire rejection of the reasoning discards the shift: `final_vote` reverts to `baseline_plausibility`, the shift flag becomes false, and the anchor is cleared. Correctly cited shifts remain unless explicitly rejected by the optional callback. Valid anchors remain reusable across turns.
 * **Invariant 5 (Proposal Pro Grounding Gate):** Each entry in `supporting_pros` must use `source_type: "canon_fact"` and its normalized `source_ref` must match a known canon fact. Ungrounded pros are pruned. The proposal proceeds only if at least 1 grounded pro remains; otherwise, the run fails with `InvalidProposalError` and the engine does not regenerate the proposal.
 * **Invariant 6 (Narrative-Only Trackers):** Rumors and actor conditions carry narrative information only. They are not consumed, recovered, stepped, or used as automatic numeric modifiers. Grounded peer votes are the only adjustment to the resolution roll.
 * **Invariant 7 (Binary Resolution):** An adjusted total of 7 or more is Success; a lower total is Failure. Success appends the world-change statement to canon only if absent. Failure introduces no narrative changes. Neither outcome adds rumors or peer arguments to canon automatically.
-* **Invariant 8 (Net Modifier Clamping):** The sum of final peer votes is clamped to $[-3, +3]$ inclusive before rolling $2d6$.
+* **Invariant 8 (Net Modifier Clamping):** After mechanical checks and any umpire rejections, sum the resulting final peer votes and clamp to $[-3, +3]$ inclusive before rolling $2d6$.
 * **Invariant 9 (Time Always Advances):** Success and Failure both resolve the turn and advance its time counter. A failed attempt is not an engine error and remains in `turn_records`.
-* **Invariant 10 (Deterministic Core Isolation):** No network socket, external process, or non-deterministic clock affects mechanical calculations. One Python `random.Random` instance is created per run, seeded from `seed` or system entropy. With a seed and identical adapter outputs, rolls and randomized initial order are reproducible for the same engine/runtime version. Proposal and peer-review adapters do not consume the engine's random stream.
+* **Invariant 10 (Deterministic Core Isolation):** No network socket, external process, or non-deterministic clock affects mechanical calculations. One Python `random.Random` instance is created per run, seeded from `seed` or system entropy. With a seed, identical proposal/peer outputs, and identical umpire rejections, mechanics are reproducible for the same engine/runtime version. Adapters and the umpire callback do not consume the engine's random stream.
 * **Invariant 11 (State and Result Atomicity):** The submitted `WorldState` is never mutated. The engine returns a final state and exactly `turn_count` records only after all requested turns complete; on any failure it raises an explicit error and returns no partial state.
 * **Invariant 12 (Time and Round Counters):** `turn_index` increments once after each resolved turn. Within a request, `session_index` increments once after every complete pass through that request's order; it does not increment for an incomplete final pass. A new request starts a new order rather than resuming an incomplete pass. There are no round-end tracker resets.
 * **Invariant 13 (Unique Actor Identity):** Actor IDs must be unique and non-empty so that each run order identifies exactly one actor per turn.
-* **Invariant 14 (Seeded Draw Order):** If `first_round_order` is omitted, `rng.shuffle` consumes the run's first random draws. Each turn draws one posture d6 with `rng.randint(1, 6)`, then selects two distinct tables with `rng.sample(["Action", "Focus", "Method", "Disposition", "Motivation"], 2)`. Preserve sample order. In that order, roll one d66 per table using two `rng.randint(1, 6)` calls (tens, then units), and convert to tens-times-ten plus units. After proposal and peer-review validation, roll the two resolution d6. Neither tier nor table contents changes this draw sequence; JSON object key order must not affect table selection.
+* **Invariant 14 (Seeded Draw Order):** If `first_round_order` is omitted, `rng.shuffle` consumes the run's first random draws. Each turn draws one posture d6 with `rng.randint(1, 6)`, then selects two distinct tables with `rng.sample(["Action", "Focus", "Method", "Disposition", "Motivation"], 2)`. Preserve sample order. In that order, roll one d66 per table using two `rng.randint(1, 6)` calls (tens, then units), and convert to tens-times-ten plus units. After proposal/peer validation and any umpire review, roll the two resolution d6. Neither tier, table contents, nor umpire decisions changes this draw sequence; JSON object key order must not affect table selection.
   * **Golden Vector (Python 3.11):** With seed `42`, actor IDs `["actor_a", "actor_b"]`, and no supplied order, shuffle produces `["actor_b", "actor_a"]`. The first posture roll is `1` (Obvious), selected tables are `Method` then `Focus`, their d66 rolls are `22` and `61`, and resolution dice are `6` and `6` (base total `12`).
-* **Invariant 15 (Explicit Failure Types):** Invalid requests raise `InvalidRunRequestError`; proposal generation, invalid proposals, peer review, and mechanics failures raise their corresponding `RunError` type. No engine-level retry or partial result is permitted.
+* **Invariant 15 (Explicit Failure Types):** Invalid requests raise `InvalidRunRequestError`; proposal generation, invalid proposals, peer review, umpire review, and mechanics failures raise their corresponding `RunError` type. No engine-level retry or partial result is permitted.
 * **Invariant 16 (Narrative Sparks):** Use the built-in default set when the request omits `spark_tables`, or the complete valid caller override when supplied. Every turn uniformly selects two distinct tables from the effective set without using the tier as a selection criterion; all table pairs are available to every tier, and selection resets each turn. The two entries and tier are narrative starting cues only. Drawing a spark never automatically changes world state.
 
 ---
@@ -533,12 +563,13 @@ The engine accepts a `RunRequest` as defined in Section 3.4: a complete `WorldSt
    b. Generate a `ProposalDraft` through the engine-side proposal-generation integration; the engine attaches the already-resolved active actor ID, posture die/roll, tier, and spark tags to form the `Proposal`.
    c. Validate and prune proposal pros against `canon_facts` only; if none remain, fail with `InvalidProposalError`.
    d. Obtain one peer evaluation from every non-active actor, then apply shift and canon-fact grounding validation without consuming any fact.
-   e. Clamp the sum of final votes to $[-3, +3]$, roll 2d6, and add the modifier.
-   f. If the adjusted total is at least 7, record Success and append the proposal statement to canon if absent. Otherwise record Failure and leave narrative state unchanged. Do not generate automatic rumors, complications, boons, or counter-facts.
-   g. Increment `turn_index`. If every actor in the fixed run order has acted, increment `session_index`. Record the proposal, evaluations, roll, modifier, Success/Failure, and end-of-turn state delta in a `TurnRecord`.
+   e. If an umpire callback is configured and any shifted votes remain, obtain its rejections and validate them. Preserve each rejected evaluation and the user's reason, then revert only those shifts to baseline. Without a callback or without rejections, mechanically valid votes proceed.
+   f. Sum the post-review final votes, clamp to $[-3, +3]$, roll 2d6, and add the modifier.
+   g. If the adjusted total is at least 7, record Success and append the proposal statement to canon if absent. Otherwise record Failure and leave narrative state unchanged. Do not generate automatic rumors, complications, boons, or counter-facts.
+   h. Increment `turn_index`. If every actor in the fixed run order has acted, increment `session_index`. Record the proposal, final evaluations, umpire rejections, roll, modifier, Success/Failure, and end-of-turn state delta in a `TurnRecord`.
 4. Return `RunResult` with the final state and ordered records. If the requested count ends partway through a round, return that partial round's state and records without incrementing `session_index`. A later request starts a fresh order and does not resume that round.
 
-The engine works on an isolated copy of the input state. It publishes no partial result: if validation, proposal generation, peer review, or mechanics fail, it raises an explicit error and the caller retains its original state unchanged.
+The engine works on an isolated copy of the input state. It publishes no partial result: if validation, proposal generation, peer review, umpire review, or mechanics fail, it raises an explicit error and the caller retains its original state unchanged.
 
 ### Outputs & Events
 
@@ -557,6 +588,8 @@ The successful output is the versioned `RunResult` in Section 3.4. The engine do
 * **Edge Case 7: Proposal Without Grounded Pros:** Ungrounded pros are pruned. If none remain, the run aborts with `InvalidProposalError`; the engine does not request regeneration.
 * **Edge Case 8: Run Ends Mid-Round:** The engine returns all resolved turn records and the corresponding partial-round state. `turn_index` reflects every resolved turn; `session_index` advances only for complete passes within this request. A subsequent request starts a new order rather than continuing the previous one.
 * **Edge Case 9: Default or Invalid Spark Tables:** An omitted `spark_tables` field selects built-in defaults. A supplied null payload, missing or extra table name, extra or missing d66 key, or non-string/blank entry is rejected with `InvalidRunRequestError` before execution. Invalid overrides are never silently replaced with defaults.
+* **Edge Case 10: Umpire Rejects a Cited Shift:** Even an exact canon citation does not prevent rejection of illogical reasoning. Revert the vote to its original baseline before aggregation, clear its shift flag and anchor, and preserve the original evaluation and reason in `umpire_rejections`. A valid rejection is normal adjudication, not an engine failure.
+* **Edge Case 11: No Umpire Intervention:** An absent callback, no remaining shifted votes, or an empty rejection list adds no rejections or approval requirement. Mechanically valid shifts proceed. A configured callback that fails or returns invalid decisions instead raises `UmpireReviewError`; it must not be treated as no intervention.
 
 ---
 
@@ -570,8 +603,11 @@ The successful output is the versioned `RunResult` in Section 3.4. The engine do
 * **Narrative Spark Selection:** Assert each turn selects two distinct tables, all ten unordered pairs are eligible under all three tiers, and later turns may reuse tables. Verify the generator receives both entries and the tier together; sparks alone cannot ground supporting arguments or vote shifts.
 * **Linter Gate Shift Bounds:** Assert shifts of $\pm 2$ are rejected and reverted to baseline. Assert `final_vote` values strictly stay within $\{-1, 0, +1\}$.
 * **Grounding Gate Verification:** Assert only canon facts ground supporting arguments and shifted votes. Nonexistent strings, actor metadata, and spark entries do not qualify unless independently present in `canon_facts`. Assert the same canon fact can be reused on later turns without mutation.
+* **Umpire Rejection:** Assert a human rejection reverts a correctly cited upward or downward shift to its exact baseline, sets the flag false and anchor null, and leaves baseline/public argument unchanged. Verify rejected votes are reverted before summation and clamping, while other votes are unchanged.
+* **Optional Umpire Callback:** Assert runs without a callback proceed unattended; no remaining shifts skips the callback; a configured callback receives all validated evaluations once per eligible turn. Empty decisions leave valid shifts unchanged. Callback decisions consume no RNG draws.
+* **Umpire Audit and Errors:** Assert rejected evaluations, original anchors, and user reasons are retained independently in peer order. Reject duplicate/unknown voters, votes already at baseline, blank reasons, malformed returns, and callback failures/cancellation with `UmpireReviewError`; preserve the submitted state and return no partial result.
 * **Proposal and Evaluation Schemas:** Assert adapter output validation, engine attachment of turn mechanics to `ProposalDraft`, and one ordered peer evaluation per non-active actor.
-* **Voting Metadata:** Assert alignment is descriptive and normalized shift flags/anchors follow the numeric shift and grounding checks, including inconsistent adapter flags.
+* **Voting Metadata:** Assert alignment is descriptive and normalized shift flags/anchors follow the numeric shift, grounding checks, and any umpire rejections, including inconsistent adapter flags.
 * **Closed State Schema:** Assert unknown fields are rejected at both world-state and actor-object levels.
 * **Non-Blank Proposals:** Reject empty and whitespace-only statements before any resolution roll or canon insertion.
 * **Net Modifier Clamping:** Assert extreme positive and negative vote sums clamp strictly at $[-3, +3]$.
@@ -583,13 +619,14 @@ The successful output is the versioned `RunResult` in Section 3.4. The engine do
 ### Integration Tests
 
 * End-to-end run tests for exact turn counts, order cycling, seeded initial order, per-turn records, time counters, partial-round behavior, and final state.
+* Compare identical seeded runs with and without a human rejection: dice draws stay the same, but the modifier, outcome, and resulting canon reflect the post-review votes. Include a callback failure after an earlier resolved turn to verify run-wide atomicity.
 * Assert the input `WorldState` remains unchanged after both successful and failed runs, and that failures expose no partial result.
 
 ---
 
 ## 8. Goldfish Review Gates
 
-The [Goldfish review report](../reviews/001_tome_core_architecture_review.md) records the historical 1.0.0 approval and findings on an earlier 1.1.0 draft. Human review subsequently changed actor terminology, the spark-table contract, and grounding scope. Independent review of the current draft and human approval remain pending.
+The [Goldfish review report](../reviews/001_tome_core_architecture_review.md) records the historical 1.0.0 approval and findings on an earlier 1.1.0 draft. Human review subsequently changed actor terminology, the spark-table contract, grounding scope, and the optional umpire-review interface. Independent review of the current draft and human approval remain pending.
 
 - [ ] Zero-context Goldfish review completed for the current Spec Version 1.1.0 draft
 - [ ] Goldfish confirmation of corrected contract gaps for Spec Version 1.1.0
