@@ -14,7 +14,7 @@
 
 | Spec Version | Summary |
 | :--- | :--- |
-| 1.1.0 | Revision under human review: standardized TriO naming and actor terminology across prose and contract identifiers; replaced step-dice and persistent actor posture with a per-turn d6 posture; simplified resolution to 2d6 plus peer votes against 7+; removed mechanical trackers, exhaustion, boons, and outcome bands. Narrative traits remain reusable grounding references. The interface contract remains a 1.0.0 draft pending approval. |
+| 1.1.0 | Revision under human review: standardized TriO naming and actor terminology across prose and contract identifiers; replaced step-dice and persistent actor posture with a per-turn d6 posture; defined built-in default spark tables with optional complete caller overrides and two tables selected randomly each turn, independently of tier; simplified resolution to 2d6 plus peer votes against 7+; removed mechanical trackers, exhaustion, boons, and outcome bands. Narrative traits remain reusable grounding references. The interface contract remains a 1.0.0 draft pending approval. |
 | 1.0.0 | Retained the engine mechanics and defined a transport-neutral multi-turn execution contract. Removed UI, hosting, authentication, deployment, persistence, and provider-selection requirements from the active scope. |
 
 #### Deferred UI / Execution-Bridge Scope
@@ -33,7 +33,7 @@ $$\mathcal{M}(\text{WorldState}_{t}, \text{RunRequest}) \longrightarrow (\text{W
 
 ### Goals
 
-* **Deterministic Mechanical Core:** Each turn uses a d6 for posture (1-3 Obvious, 4-5 Option, 6 Odd), paired d66 spark-table lookups selected by that posture, and 2d6 plus peer votes against target number 7. A supplied seed fixes the engine-controlled random sequence for the same engine/runtime version.
+* **Deterministic Mechanical Core:** Each turn uses a d6 for posture (1-3 Obvious, 4-5 Option, 6 Odd), d66 lookups on two randomly selected tables independently of posture, and 2d6 plus peer votes against target number 7. Tables come from built-in defaults or a complete caller override. A supplied seed fixes the engine-controlled random sequence for the same engine/runtime version.
 * **Narrative-Only Trackers:** Actor conditions and capabilities are narrative facts and traits, not mechanical meters. There are no persistent posture levels, trait exhaustion, recovery, or automatic bonuses from trackers. Turn and round counters record simulation time only.
 * **Strict Epistemic Grounding (The Linter Gate):** Proposal generators and peer reviewers cannot introduce ungrounded setting details or arbitrary voting shifts. Grounding checks enforce whitespace-stripped exact matching against existing `canon_facts` or intrinsic actor `traits`.
 * **Transport-Neutral Execution Contract:** Define versioned input, output, turn-order, validation, and failure semantics without prescribing a UI, transport, hosting provider, or persistence mechanism.
@@ -71,15 +71,15 @@ Posture is a turn-local result, not a persistent actor tracker. It is recorded a
 
 ### 2.2 Dual Spark Table Seeding
 
-To force semantic divergence, the engine rolls two $d66$ checks against the bundled `trio-d66-v1` spark-table set (Action, Disposition, Motivation, Focus, Method). Its canonical 36-entry mappings are the engine's bundled template data in [src/tome/tables.py](../../src/tome/tables.py); a caller may supply a complete custom set in the run request. A release must not change the bundled data without incrementing the table-set version. The tier dictates the table pairings:
+The engine comes with five default d66 tables: `Action`, `Focus`, `Method`, `Disposition`, and `Motivation`. The built-in set is identified as `trio-d66-v1`; its contents are the template mappings in [src/tome/tables.py](../../src/tome/tables.py). Changes to the built-in mappings require a new table-set version.
 
-The bundled table content is derived from Cezar Capacle's TriO, licensed under CC BY-SA 4.0; see the repository license and README attribution.
+If `RunRequest.spark_tables` is omitted, the engine uses those defaults. A caller may instead supply a complete replacement set containing all five named tables. Partial overrides, null payloads, and malformed tables are rejected rather than silently replaced with defaults.
 
-* **The Obvious:** `Action` + `Focus`
-* **The Option:** `Method` + `Focus`
-* **The Odd:** `Disposition` + `Motivation`
+For each turn, the engine selects two distinct tables uniformly at random from those five, independently of the TriO tier. It rolls one d66 entry from each selected table. Table selection is fresh on every turn, so a table may be used again on later turns.
 
-An umpire may provide a complete custom `SparkTables` object in `RunRequest`; if omitted, the engine uses the bundled template set. Partial custom table overrides are invalid.
+The two entry values and the independently rolled Obvious/Option/Odd tier form the actor's narrative starting cues for proposing a contribution to the changed state. They are not established facts, supporting evidence, or numeric modifiers. The proposal must still ground its supporting arguments in existing canon or the actor's traits.
+
+The engine records the two cues in selection order as `spark_tags`, each formatted `<TableName>:<entry>`, and passes them together with the tier to the proposal generator. No table is assigned to a particular tier.
 
 $d66$ notation is standard tabletop die-rolling: two six-sided dice are rolled where the first represents the tens digit and the second represents the units digit ($10 \times \text{die}_1 + \text{die}_2$), producing 36 discrete values from 11 through 66.
 
@@ -181,7 +181,7 @@ Proposal = {
   posture_die: "d6",
   posture_roll: integer in [1, 6],
   trio_tier: "Obvious" | "Option" | "Odd",
-  spark_tags: string[] with exactly 2 tier-appropriate table tags,
+  spark_tags: string[] with exactly 2 tags from distinct randomly selected tables,
   world_change_statement: non-whitespace string,
   supporting_pros: SupportingPro[1..2] with at least 1 grounded entry after pruning
 }
@@ -193,7 +193,7 @@ Proposal = {
   "posture_die": "d6",
   "posture_roll": 6,
   "trio_tier": "Odd",
-  "spark_tags": ["Disposition:Distrustful", "Motivation:Obsession"],
+  "spark_tags": ["Focus:Resource access", "Method:Public declaration"],
   "world_change_statement": "The Iron Choir establishes a fortified scrap blockade across Conduit 4, redirecting geothermal power exclusively to their foundries.",
   "supporting_pros": [
     {
@@ -238,7 +238,7 @@ PeerEvaluation = {
 
 ### 3.4 Run Request, Result, and Turn Record (Interface Contract v1.0.0)
 
-The caller supplies a full world state, a positive number of turns, and optionally the actor order for the first round and a random seed. If `first_round_order` is omitted, the engine creates a random permutation; when `seed` is supplied, that permutation is reproducible. The supplied order must contain every actor ID exactly once. The engine repeats that order until the requested number of turns has completed.
+The caller supplies a full world state and a positive number of turns, with optional spark-table overrides, actor order for the first round, and random seed. If `first_round_order` is omitted, the engine creates a random permutation; when `seed` is supplied, that permutation is reproducible. The supplied order must contain every actor ID exactly once. The engine repeats that order until the requested number of turns has completed.
 
 The interface types are:
 
@@ -247,9 +247,9 @@ RunRequest = {
   contract_version: "1.0.0",
   world_state: WorldState,
   turn_count: integer where turn_count >= 1,
+  spark_tables?: SparkTables,
   first_round_order?: string[],
-  seed?: integer where seed >= 0,
-  spark_tables?: SparkTables
+  seed?: integer where seed >= 0
 }
 
 RunResult = {
@@ -260,11 +260,11 @@ RunResult = {
 }
 
 SparkTables = {
-  Action: Record<D66, non-empty string>,
-  Focus: Record<D66, non-empty string>,
-  Method: Record<D66, non-empty string>,
-  Disposition: Record<D66, non-empty string>,
-  Motivation: Record<D66, non-empty string>
+  Action: Record<D66, non-whitespace string>,
+  Focus: Record<D66, non-whitespace string>,
+  Method: Record<D66, non-whitespace string>,
+  Disposition: Record<D66, non-whitespace string>,
+  Motivation: Record<D66, non-whitespace string>
 }
 
 D66 = exactly the 36 keys with tens and units digits from 1 through 6;
@@ -307,7 +307,9 @@ RunFailure = {
 
 `turn_index` and `session_index` in a record are their values after the turn has resolved and the round boundary (if any) has been processed. `adjusted_total` is `resolution_roll + net_vote_modifier`.
 
-The request's `first_round_order`, `seed`, and `spark_tables` are absent-or-value fields; `null` is invalid. If no seed is supplied, the engine initializes its run-local random generator from system entropy and the run is not reproducible.
+`first_round_order`, `seed`, and `spark_tables` are optional. None of these fields accepts `null`. Omitting `spark_tables` selects the built-in defaults; omitting `seed` initializes the run-local random generator from system entropy and makes the run non-reproducible.
+
+The complete example below demonstrates an override using illustrative caller-supplied cue labels. These entries are not the built-in defaults. To use defaults instead, omit the entire `spark_tables` field.
 
 ```json
 {
@@ -333,20 +335,62 @@ The request's `first_round_order`, `seed`, and `spark_tables` are absent-or-valu
     ]
   },
   "turn_count": 1,
+  "spark_tables": {
+    "Action": {
+      "11": "Action 11", "12": "Action 12", "13": "Action 13", "14": "Action 14", "15": "Action 15", "16": "Action 16",
+      "21": "Action 21", "22": "Action 22", "23": "Action 23", "24": "Action 24", "25": "Action 25", "26": "Action 26",
+      "31": "Action 31", "32": "Action 32", "33": "Action 33", "34": "Action 34", "35": "Action 35", "36": "Action 36",
+      "41": "Action 41", "42": "Action 42", "43": "Action 43", "44": "Action 44", "45": "Action 45", "46": "Action 46",
+      "51": "Action 51", "52": "Action 52", "53": "Action 53", "54": "Action 54", "55": "Action 55", "56": "Action 56",
+      "61": "Action 61", "62": "Action 62", "63": "Action 63", "64": "Action 64", "65": "Action 65", "66": "Action 66"
+    },
+    "Focus": {
+      "11": "Focus 11", "12": "Focus 12", "13": "Focus 13", "14": "Focus 14", "15": "Focus 15", "16": "Focus 16",
+      "21": "Focus 21", "22": "Focus 22", "23": "Focus 23", "24": "Focus 24", "25": "Focus 25", "26": "Focus 26",
+      "31": "Focus 31", "32": "Focus 32", "33": "Focus 33", "34": "Focus 34", "35": "Focus 35", "36": "Focus 36",
+      "41": "Focus 41", "42": "Focus 42", "43": "Focus 43", "44": "Focus 44", "45": "Focus 45", "46": "Focus 46",
+      "51": "Focus 51", "52": "Focus 52", "53": "Focus 53", "54": "Focus 54", "55": "Focus 55", "56": "Focus 56",
+      "61": "Focus 61", "62": "Focus 62", "63": "Focus 63", "64": "Focus 64", "65": "Focus 65", "66": "Resource access"
+    },
+    "Method": {
+      "11": "Method 11", "12": "Method 12", "13": "Public declaration", "14": "Method 14", "15": "Method 15", "16": "Method 16",
+      "21": "Method 21", "22": "Method 22", "23": "Method 23", "24": "Method 24", "25": "Method 25", "26": "Method 26",
+      "31": "Method 31", "32": "Method 32", "33": "Method 33", "34": "Method 34", "35": "Method 35", "36": "Method 36",
+      "41": "Method 41", "42": "Method 42", "43": "Method 43", "44": "Method 44", "45": "Method 45", "46": "Method 46",
+      "51": "Method 51", "52": "Method 52", "53": "Method 53", "54": "Method 54", "55": "Method 55", "56": "Method 56",
+      "61": "Method 61", "62": "Method 62", "63": "Method 63", "64": "Method 64", "65": "Method 65", "66": "Method 66"
+    },
+    "Disposition": {
+      "11": "Disposition 11", "12": "Disposition 12", "13": "Disposition 13", "14": "Disposition 14", "15": "Disposition 15", "16": "Disposition 16",
+      "21": "Disposition 21", "22": "Disposition 22", "23": "Disposition 23", "24": "Disposition 24", "25": "Disposition 25", "26": "Disposition 26",
+      "31": "Disposition 31", "32": "Disposition 32", "33": "Disposition 33", "34": "Disposition 34", "35": "Disposition 35", "36": "Disposition 36",
+      "41": "Disposition 41", "42": "Disposition 42", "43": "Disposition 43", "44": "Disposition 44", "45": "Disposition 45", "46": "Disposition 46",
+      "51": "Disposition 51", "52": "Disposition 52", "53": "Disposition 53", "54": "Disposition 54", "55": "Disposition 55", "56": "Disposition 56",
+      "61": "Disposition 61", "62": "Disposition 62", "63": "Disposition 63", "64": "Disposition 64", "65": "Disposition 65", "66": "Disposition 66"
+    },
+    "Motivation": {
+      "11": "Motivation 11", "12": "Motivation 12", "13": "Motivation 13", "14": "Motivation 14", "15": "Motivation 15", "16": "Motivation 16",
+      "21": "Motivation 21", "22": "Motivation 22", "23": "Motivation 23", "24": "Motivation 24", "25": "Motivation 25", "26": "Motivation 26",
+      "31": "Motivation 31", "32": "Motivation 32", "33": "Motivation 33", "34": "Motivation 34", "35": "Motivation 35", "36": "Motivation 36",
+      "41": "Motivation 41", "42": "Motivation 42", "43": "Motivation 43", "44": "Motivation 44", "45": "Motivation 45", "46": "Motivation 46",
+      "51": "Motivation 51", "52": "Motivation 52", "53": "Motivation 53", "54": "Motivation 54", "55": "Motivation 55", "56": "Motivation 56",
+      "61": "Motivation 61", "62": "Motivation 62", "63": "Motivation 63", "64": "Motivation 64", "65": "Motivation 65", "66": "Motivation 66"
+    }
+  },
   "first_round_order": ["actor_iron_choir", "actor_dock_syndicate"],
   "seed": 20
 }
 ```
 
 `first_round_order` and `seed` are optional. `turn_count` must be a positive integer and `seed`, when supplied, must be a non-negative integer. The run request does not include credentials, storage paths, transport metadata, or provider-specific configuration.
-`spark_tables`, when supplied, must contain all five tables, each with exactly the 36 valid d66 keys and a non-empty string value for every key. Otherwise, `spark_table_source` in the result is `trio-d66-v1`; when supplied, it is `request`.
+When supplied, `spark_tables` must contain exactly the five named tables, each with exactly the 36 valid d66 keys and a non-whitespace string value for every key. Missing tables, extra table names, and incomplete tables are invalid. `spark_table_source` in the result is `request` for a valid override, or `trio-d66-v1` when the request omits overrides.
 
 The successful result contains the complete final world state and exactly one ordered record for each completed turn:
 
 ```json
 {
   "contract_version": "1.0.0",
-  "spark_table_source": "trio-d66-v1",
+  "spark_table_source": "request",
   "final_world_state": {
     "session_index": 0,
     "turn_index": 1,
@@ -380,7 +424,7 @@ The successful result contains the complete final world state and exactly one or
         "posture_die": "d6",
         "posture_roll": 6,
         "trio_tier": "Odd",
-        "spark_tags": ["Disposition:Unpredictable", "Motivation:Obsession"],
+        "spark_tags": ["Focus:Resource access", "Method:Public declaration"],
         "world_change_statement": "The Iron Choir claims the conduit.",
         "supporting_pros": [
           {
@@ -427,11 +471,11 @@ The successful result contains the complete final world state and exactly one or
 }
 ```
 
-Each `turn_record` preserves the proposal and its grounded pros, all peer evaluations after grounding validation, the clamped net vote modifier, resolution roll and adjusted total, success or failure, and the state changes applied by that turn. It is an audit record of why the final state changed; it is not a UI-formatted dossier.
+Each `turn_record` preserves the proposal and its grounded pros, its `trio_tier`, its two selected table names/entry values in `spark_tags`, all peer evaluations after grounding validation, the clamped net vote modifier, resolution roll and adjusted total, success or failure, and the state changes applied by that turn. It is an audit record of why the final state changed; it is not a UI-formatted dossier.
 
 `peer_evaluations` contains exactly one evaluation for each non-active actor, in the order those actors appear in the input `WorldState`. `state_changes` contains each changed top-level `WorldState` field exactly once, ordered by ascending JSON Pointer. Each entry's `before` and `after` are the complete JSON values of that field; `reason` describes every deterministic engine rule that affected it, in execution order. These values represent the net change at the end of the turn, including counter updates. A completed run contains exactly `turn_count` records, including failed attempts; errors use one of the `RunError` types and never include a partial result.
 
-The proposal's `active_actor_id` must equal the actor taking the turn; its die is always `d6`, its roll is the engine's turn-local posture roll, and its tier and two spark tags must match that roll and selected tables. Each peer evaluation's voter ID must identify a distinct non-active actor. A caller-supplied state must contain every field in Section 3.1; actor IDs are non-empty and unique. All contract objects reject undeclared fields.
+The proposal's `active_actor_id` must equal the actor taking the turn; its die is always `d6`, its roll is the engine's turn-local posture roll, and its tier must match that roll. Its two spark tags must match the d66 entries from the independently selected distinct tables in selection order, not a tier-specific pairing. Each peer evaluation's voter ID must identify a distinct non-active actor. A caller-supplied state must contain every field in Section 3.1; actor IDs are non-empty and unique. All contract objects reject undeclared fields.
 
 ### 3.5 Engine-Side Proposal and Peer-Review Adapters
 
@@ -459,6 +503,8 @@ PeerReviewer(
 
 The proposal generator returns only a `ProposalDraft`; the engine creates the complete `Proposal` by attaching the active actor ID, posture die and roll, tier, and spark tags already resolved for that turn. Each adapter must return the declared schema and must not mutate its arguments. The runner supplies isolated snapshots of the current state and proposal. Provider/network errors or malformed output become `ProposalGenerationError` or `PeerReviewError`. The engine applies grounding and voting validation to returned values. It prunes ungrounded proposal pros; if no grounded pro remains, it raises `InvalidProposalError` without automatically retrying. Any adapter retry policy is outside the engine contract. Engine errors expose the stable code and message represented by `RunFailure`; an execution bridge maps those values into its chosen transport response without returning partial state.
 
+The generator receives the TriO tier and both selected spark tags together as the narrative starting cues. It must not replace the sampled tables with a tier-specific pair or treat their entries as grounding evidence. The active actor and current world state provide the context and permitted grounding references.
+
 An empty or whitespace-only world-change statement is malformed proposal output and raises `ProposalGenerationError` before adjudication; it must never enter canon. Non-blank statements retain their original text.
 
 ---
@@ -478,9 +524,10 @@ An empty or whitespace-only world-change statement is malformed proposal output 
 * **Invariant 11 (State and Result Atomicity):** The submitted `WorldState` is never mutated. The engine returns a final state and exactly `turn_count` records only after all requested turns complete; on any failure it raises an explicit error and returns no partial state.
 * **Invariant 12 (Time and Round Counters):** `turn_index` increments once after each resolved turn. Within a request, `session_index` increments once after every complete pass through that request's order; it does not increment for an incomplete final pass. A new request starts a new order rather than resuming an incomplete pass. There are no round-end tracker resets.
 * **Invariant 13 (Unique Actor Identity):** Actor IDs must be unique and non-empty so that each run order identifies exactly one actor per turn.
-* **Invariant 14 (Seeded Draw Order):** If `first_round_order` is omitted, `random.Random.shuffle` consumes the run's first random draws. Every die face is drawn with `rng.randint(1, 6)`. For each turn, draw one posture d6, two d66 rolls (tens then units for each), and two resolution d6, in that order. Convert each d66 to tens-times-ten plus units. The Odd posture uses `Disposition` + `Motivation`. Custom tables change labels only, not draw order.
-  * **Golden Vector (Python 3.11):** With seed `42`, actor IDs `["actor_a", "actor_b"]`, and no supplied order, shuffle produces `["actor_b", "actor_a"]`. The first posture roll is `1`, spark d66 rolls are `63` and `22`, and resolution dice are `2` and `6` (base total `8`).
+* **Invariant 14 (Seeded Draw Order):** If `first_round_order` is omitted, `rng.shuffle` consumes the run's first random draws. Each turn draws one posture d6 with `rng.randint(1, 6)`, then selects two distinct tables with `rng.sample(["Action", "Focus", "Method", "Disposition", "Motivation"], 2)`. Preserve sample order. In that order, roll one d66 per table using two `rng.randint(1, 6)` calls (tens, then units), and convert to tens-times-ten plus units. After proposal and peer-review validation, roll the two resolution d6. Neither tier nor table contents changes this draw sequence; JSON object key order must not affect table selection.
+  * **Golden Vector (Python 3.11):** With seed `42`, actor IDs `["actor_a", "actor_b"]`, and no supplied order, shuffle produces `["actor_b", "actor_a"]`. The first posture roll is `1` (Obvious), selected tables are `Method` then `Focus`, their d66 rolls are `22` and `61`, and resolution dice are `6` and `6` (base total `12`).
 * **Invariant 15 (Explicit Failure Types):** Invalid requests raise `InvalidRunRequestError`; proposal generation, invalid proposals, peer review, and mechanics failures raise their corresponding `RunError` type. No engine-level retry or partial result is permitted.
+* **Invariant 16 (Narrative Sparks):** Use the built-in default set when the request omits `spark_tables`, or the complete valid caller override when supplied. Every turn uniformly selects two distinct tables from the effective set without using the tier as a selection criterion; all table pairs are available to every tier, and selection resets each turn. The two entries and tier are narrative starting cues only. Drawing a spark never automatically changes world state.
 
 ---
 
@@ -488,14 +535,14 @@ An empty or whitespace-only world-change statement is malformed proposal output 
 
 ### Inputs & Triggers
 
-The engine accepts a `RunRequest` as defined in Section 3.4: a complete `WorldState`, positive `turn_count`, and optional `first_round_order`, `seed`, and `spark_tables`. No passcode, transport token, file path, storage location, or deployment trigger is an engine input.
+The engine accepts a `RunRequest` as defined in Section 3.4: a complete `WorldState`, positive `turn_count`, and optional `spark_tables`, `first_round_order`, and `seed`. No passcode, transport token, file path, storage location, or deployment trigger is an engine input.
 
 ### Turn Execution
 
-1. Validate the complete world state, unique actor IDs, positive `turn_count`, optional order permutation, and optional complete `spark_tables` payload before executing any turn. A run requires at least one actor.
-2. Select custom `spark_tables` from the request, or the bundled template table set when omitted. Create one `random.Random` instance from the non-negative `seed`, or system entropy when omitted. Select the first-round order from the supplied permutation, or shuffle the actor IDs with that instance.
+1. Validate the complete world state, unique actor IDs, positive `turn_count`, optional order permutation, and any supplied complete `spark_tables` override before executing any turn. A run requires at least one actor. Invalid supplied tables fail validation; they do not trigger a fallback.
+2. Select the built-in `trio-d66-v1` tables if `spark_tables` is omitted; otherwise use the valid caller-supplied set unchanged. Create one `random.Random` instance from the non-negative `seed`, or system entropy when omitted. Select the first-round order from the supplied permutation, or shuffle the actor IDs with that instance.
 3. Execute exactly `turn_count` turns, advancing through the order and restarting at its first actor after each complete pass:
-   a. Roll one posture d6, map it to Obvious/Option/Odd, and draw the paired d66 spark tags for that posture.
+   a. Roll one posture d6 and map it to Obvious/Option/Odd. Independently sample two distinct tables, roll one d66 entry from each, and construct their spark tags in selection order.
    b. Generate a `ProposalDraft` through the engine-side proposal-generation integration; the engine attaches the already-resolved active actor ID, posture die/roll, tier, and spark tags to form the `Proposal`.
    c. Validate and prune proposal pros against canon facts and active-actor traits; if none remain, fail with `InvalidProposalError`.
    d. Obtain one peer evaluation from every non-active actor, then apply shift and grounding validation without consuming any trait or fact.
@@ -522,7 +569,7 @@ The successful output is the versioned `RunResult` in Section 3.4. The engine do
 * **Edge Case 6: Proposal or Peer-Review Failure:** Any engine-side proposal or peer-review integration failure, including malformed output, aborts with `ProposalGenerationError` or `PeerReviewError`. The engine does not retry. No partial state or turn records are returned.
 * **Edge Case 7: Proposal Without Grounded Pros:** Ungrounded pros are pruned. If none remain, the run aborts with `InvalidProposalError`; the engine does not request regeneration.
 * **Edge Case 8: Run Ends Mid-Round:** The engine returns all resolved turn records and the corresponding partial-round state. `turn_index` reflects every resolved turn; `session_index` advances only for complete passes within this request. A subsequent request starts a new order rather than continuing the previous one.
-* **Edge Case 9: Invalid Spark Tables:** A custom table payload missing a table, containing an extra or missing d66 key, or containing an empty value is rejected with `InvalidRunRequestError` before execution.
+* **Edge Case 9: Default or Invalid Spark Tables:** An omitted `spark_tables` field selects built-in defaults. A supplied null payload, missing or extra table name, extra or missing d66 key, or non-string/blank entry is rejected with `InvalidRunRequestError` before execution. Invalid overrides are never silently replaced with defaults.
 
 ---
 
@@ -530,9 +577,10 @@ The successful output is the versioned `RunResult` in Section 3.4. The engine do
 
 ### Unit Tests (`tests/test_tome_core.py`)
 
-* **Posture d6 Mapping:** Exhaustively assert faces 1-3 map to Obvious, 4-5 to Option, and 6 to Odd; every actor uses the same mapping. Verify the three postures select the specified table pairs.
-* **Seeded Random Sequence:** Assert golden draw vectors for seeded order shuffling, posture d6, both d66 lookups, and resolution dice; verify every face uses `randint(1, 6)` in the specified order.
-* **Spark Table Payload:** Assert omitted tables select `trio-d66-v1`; reject partial, extra-key, missing-key, or empty-value custom tables; verify valid custom table values produce matching spark tags.
+* **Posture d6 Mapping:** Exhaustively assert faces 1-3 map to Obvious, 4-5 to Option, and 6 to Odd; every actor uses the same mapping. Assert no tier filters or replaces the random table selection.
+* **Seeded Random Sequence:** Assert golden vectors for seeded actor-order shuffling, posture d6, two-table sampling, both d66 lookups, and resolution dice. Verify the canonical sampling list, sample order, and `randint(1, 6)` sequence, including independence from JSON key order.
+* **Spark Table Defaults and Overrides:** Assert omitted `spark_tables` selects `trio-d66-v1`; valid complete overrides produce exact supplied `<TableName>:<entry>` tags and source `request`. Reject null payloads, missing/extra table names or d66 keys, and non-string/blank entries without falling back to defaults. Table-source selection must not consume RNG draws or alter the table-sampling procedure.
+* **Narrative Spark Selection:** Assert each turn selects two distinct tables, all ten unordered pairs are eligible under all three tiers, and later turns may reuse tables. Verify the generator receives both entries and the tier together; sparks alone cannot ground supporting arguments or vote shifts.
 * **Linter Gate Shift Bounds:** Assert shifts of $\pm 2$ are rejected and reverted to baseline. Assert `final_vote` values strictly stay within $\{-1, 0, +1\}$.
 * **Grounding Gate Verification:** Assert valid canon facts and valid voter traits allow shifts; nonexistent strings cause reversion to baseline. Assert the same valid reference can be reused on later turns without mutation.
 * **Proposal and Evaluation Schemas:** Assert adapter output validation, engine attachment of turn mechanics to `ProposalDraft`, and one ordered peer evaluation per non-active actor.
@@ -554,8 +602,8 @@ The successful output is the versioned `RunResult` in Section 3.4. The engine do
 
 ## 8. Goldfish Review Gates
 
-The [Goldfish review report](../reviews/001_tome_core_architecture_review.md) records the historical 1.0.0 approval and the 1.1.0 review findings. The current draft addresses those findings, but independent confirmation and human approval remain pending.
+The [Goldfish review report](../reviews/001_tome_core_architecture_review.md) records the historical 1.0.0 approval and findings on an earlier 1.1.0 draft. Human review subsequently changed actor terminology and the spark-table contract. Independent review of the current draft and human approval remain pending.
 
-- [x] Zero-context Goldfish review completed for Spec Version 1.1.0
+- [ ] Zero-context Goldfish review completed for the current Spec Version 1.1.0 draft
 - [ ] Goldfish confirmation of corrected contract gaps for Spec Version 1.1.0
 - [ ] Human developer approval signed off
