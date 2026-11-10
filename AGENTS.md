@@ -1,11 +1,11 @@
-# AGENTS.md — Triple-O Matrix Engine (TOME) Agent Conventions
+# AGENTS.md — TriO Matrix Engine (TOME) Agent Conventions
 
 This document specifies repository calibration, architectural invariants, and agent interaction contracts for developing **TOME** (`efsalvarenga/tome`).
 
 ## 1. Project Overview & Architectural Boundaries
 
 * **Repository Identity:** `tome` is a standalone, serverless simulation engine for multi-agent complex systems where fundamental behavioral laws are incomplete or uncertain, providing a formal computational testbed for human umpires and analysts to explore plausible realisations of multi-actor interactions.
-* **Parent Concept:** Integrates **Chris Engle Matrix Games** (structured epistemic argumentation and probability resolution under uncertainty) with **Cezar Capacle's Triple-O framework** (structural posture step-dice and dual spark tables for non-mode-collapsing divergence).
+* **Parent Concept:** Integrates **Chris Engle Matrix Games** (structured epistemic argumentation and probability resolution under uncertainty) with **Cezar Capacle's TriO framework** (structural posture step-dice and dual spark tables for non-mode-collapsing divergence).
 * **GitOps State Flow:** Pure state transformer:
   $$\mathcal{M}(\text{WorldState}_{t}, \text{Interventions}) \longrightarrow \text{WorldState}_{t+1} + \text{SimulationDossier}$$
 * **Core Philosophy:**
@@ -40,4 +40,3 @@ This document specifies repository calibration, architectural invariants, and ag
 * Development branches use clear prefixes: `feat/`, `fix/`, `docs/`, `chore/`.
 * Commits should be atomic with clear semantic messages.
 * **Autonomous Merge Prohibition [HUMAN-ONLY]:** Under NO circumstances may any autonomous agent call `gh pr merge`, invoke GitHub REST merge API endpoints, or merge topic branches directly into `main`. Merging PRs into `main` is strictly reserved for the human developer. Agents must push topic branches, open Pull Requests with verification proofs, present the PR URL to the user, and stop.
-
