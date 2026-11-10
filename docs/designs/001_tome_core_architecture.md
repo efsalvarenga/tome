@@ -4,7 +4,7 @@
 
 | Metadata | Value |
 | :--- | :--- |
-| Spec Version | 1.0.0 |
+| Spec Version | 1.1.0 |
 | Interface Contract Version | 1.0.0 |
 | Status | Under Review |
 | Author | Elephant Agent & Developer |
@@ -14,7 +14,7 @@
 
 | Spec Version | Summary |
 | :--- | :--- |
-| 1.0.0 (naming correction) | Standardized the name to TriO, the proposal field to `trio_tier`, and the template table-set identifier to `trio-d66-v1`. External attribution URLs are unchanged. |
+| 1.1.0 | Revision under human review: standardized the name to TriO, the proposal field to `trio_tier`, and the template table-set identifier to `trio-d66-v1`. External attribution URLs are unchanged. The interface contract remains at 1.0.0 pending approval. |
 | 1.0.0 | Retained the engine mechanics and defined a transport-neutral multi-turn execution contract. Removed UI, hosting, authentication, deployment, persistence, and provider-selection requirements from the active scope. |
 
 #### Deferred UI / Execution-Bridge Scope
@@ -569,6 +569,8 @@ The successful output is the versioned `RunResult` in Section 3.4. The engine do
 
 ## 8. Goldfish Review Gates
 
-- [x] Zero-context Goldfish review completed for Spec Version 1.0.0
-- [x] Logic contradictions and edge-case holes addressed
+The existing [Goldfish review](../reviews/001_tome_core_architecture_review.md) applies to Spec Version 1.0.0, not this revision.
+
+- [ ] Zero-context Goldfish review completed for Spec Version 1.1.0
+- [ ] Logic contradictions and edge-case holes addressed for Spec Version 1.1.0
 - [ ] Human developer approval signed off
