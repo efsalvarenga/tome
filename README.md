@@ -1,4 +1,4 @@
-# Triple-O Matrix Engine (TOME)
+# TriO Matrix Engine (TOME)
 
 [![License: MIT](https://img.shields.io/badge/Code_License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![License: CC BY-SA 4.0](https://img.shields.io/badge/Content_License-CC_BY--SA_4.0-lightgrey.svg)](https://creativecommons.org/licenses/by-sa/4.0/)
@@ -35,7 +35,7 @@ TOME solves this by wedding **Chris Engle Matrix Games** with **Cezar Capacle's 
                                               │ Step-Die (d4, d6, d8)
                                               ▼
 ┌───────────────────────┐         ┌────────────────────────┐
-│   Dual Spark Tables   ├────────►│  Triple-O Action Tier  │
+│   Dual Spark Tables   ├────────►│    TriO Action Tier    │
 │ Paired d66 Divergence │         │ Obvious / Option / Odd │
 └───────────────────────┘         └───────────┬────────────┘
                                               │
@@ -75,7 +75,7 @@ Originally developed for professional wargaming, policy analysis, and strategic 
 * **Supporting Arguments (Pros):** Concrete arguments grounded strictly in established canon facts or intrinsic actor traits.
 * **Adversarial Peer Review:** Other actors in the system evaluate baseline plausibility from their operational perspectives, apply strategic motivated shifts (*The Cheeky Pivot*), and argue complications or counter-arguments.
 
-### 2. Triple-O Behavioral Posture & Divergence
+### 2. TriO Behavioral Posture & Divergence
 Actors shift behavioral modes based on their internal structural integrity:
 * **Structural Posture:**
   * **Stable ($1d4$):** Institutionally secure. $75\%$ predictable doctrinal moves (*The Obvious*), $25\%$ lateral innovations (*The Option*), $0\%$ radical gambits.
@@ -122,7 +122,7 @@ tome/
 │       ├── dice.py         # Step-dice (1d4, 1d6, 1d8), d66, and 2d6 resolution
 │       ├── models.py       # Pydantic v2 schemas (WorldState, Faction, Proposal, PeerEvaluation)
 │       ├── runner.py       # Turn orchestration loop & state transformer
-│       ├── tables.py       # Canonical d66 Triple-O spark tables
+│       ├── tables.py       # Canonical d66 TriO spark tables
 │       └── validator.py    # Epistemic Linter Gate, tie-breakers, and outcome mutators
 ├── tests/
 │   └── test_tome_core.py   # Deterministic unit and integration test suite
@@ -174,7 +174,7 @@ ruff format --check .
 ## Attribution & Acknowledgements
 
 This software implements game mechanics derived from:
-- Triple-O by Cezar Capacle (https://capacle.itch.io/triple-o), licensed under CC BY-SA 4.0.
+- TriO by Cezar Capacle (https://capacle.itch.io/triple-o), licensed under CC BY-SA 4.0.
 - Engle Matrix Games, invented by Chris Engle, licensed under CC BY-SA 4.0. Matrix Games were invented by Chris Engle.
 
 ---

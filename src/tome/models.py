@@ -61,7 +61,7 @@ class Proposal(BaseModel):
     active_faction_id: str
     posture_die: str
     posture_roll: int
-    triple_o_tier: str
+    trio_tier: str
     spark_tags: list[str] = Field(default_factory=list)
     world_change_statement: str
     supporting_pros: list[SupportingPro] = Field(default_factory=list)

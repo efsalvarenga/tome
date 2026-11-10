@@ -1,4 +1,4 @@
-"""Deterministic dice mechanics and Triple-O posture resolution for TOME."""
+"""Deterministic dice mechanics and TriO posture resolution for TOME."""
 
 import random
 from enum import Enum
@@ -38,7 +38,7 @@ def get_posture_die_sides(posture: Posture) -> int:
 
 
 def resolve_posture_tier(posture: Posture, seed: int | None = None) -> tuple[int, PostureTier]:
-    """Roll a faction's posture step-die and determine its Triple-O action tier."""
+    """Roll a faction's posture step-die and determine its TriO action tier."""
     sides = get_posture_die_sides(posture)
     roll = roll_dice(sides, count=1, seed=seed)
     if roll <= 3:

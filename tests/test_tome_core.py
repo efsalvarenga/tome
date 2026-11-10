@@ -9,7 +9,7 @@ from tome.validator import (
 
 
 def test_posture_step_die_bounds():
-    """Verify posture step-dice never exceed their physical bounds and map to Triple-O tiers."""
+    """Verify posture step-dice never exceed their physical bounds and map to TriO tiers."""
     for _ in range(500):
         roll, tier = resolve_posture_tier(Posture.STABLE, seed=None)
         assert 1 <= roll <= 4
@@ -226,7 +226,7 @@ def test_outcome_band_state_mutations():
         active_faction_id="f1",
         posture_die="d6",
         posture_roll=2,
-        triple_o_tier="Obvious",
+        trio_tier="Obvious",
         spark_tags=["Action:Attack", "Focus:Resource"],
         world_change_statement="F1 takes over mine.",
         supporting_pros=[SupportingPro(source_type="canon_fact", source_ref="F0", argument="Arg")],
@@ -259,7 +259,7 @@ def test_outcome_band_state_mutations():
         active_faction_id="f1",
         posture_die="d4",
         posture_roll=1,
-        triple_o_tier="Obvious",
+        trio_tier="Obvious",
         spark_tags=[],
         world_change_statement="F1 mines ore.",
         supporting_pros=[SupportingPro(source_type="canon_fact", source_ref="F0", argument="Arg")],
@@ -273,7 +273,7 @@ def test_outcome_band_state_mutations():
         active_faction_id="f1",
         posture_die="d4",
         posture_roll=1,
-        triple_o_tier="Obvious",
+        trio_tier="Obvious",
         spark_tags=[],
         world_change_statement="F1 builds wall.",
         supporting_pros=[SupportingPro(source_type="canon_fact", source_ref="F0", argument="Arg")],
@@ -315,7 +315,7 @@ def test_full_simulation_cycle_e2e():
             active_faction_id=fac.id,
             posture_die="d8" if fac.posture == Posture.CORNERED else "d4",
             posture_roll=1,
-            triple_o_tier=tier.value,
+            trio_tier=tier.value,
             spark_tags=tags,
             world_change_statement=f"{fac.name} claims the conduit.",
             supporting_pros=[
@@ -343,6 +343,8 @@ def test_full_simulation_cycle_e2e():
     assert updated_state.session_index == 2
     assert len(proposals) == 2
     assert len(evals) == 2
+    for proposal in proposals:
+        assert proposal.model_dump()["trio_tier"] in {tier.value for tier in PostureTier}
     # Verify exhausted traits are clean at cycle conclusion
     for f in updated_state.factions:
         assert len(f.exhausted_traits) == 0
