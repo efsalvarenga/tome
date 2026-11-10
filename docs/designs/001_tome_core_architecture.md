@@ -92,7 +92,8 @@ A proposal is a structured argument:
 ### 2.4 Peer Review & Vote Adjustment
 
 Every non-active actor evaluates the proposal as an independent adjudicator:
-1. **Baseline Plausibility:** Rate proposal as $+1$ (Plausible), $0$ (Uncertain), or $-1$ (Implausible).
+
+1. **Baseline Plausibility:** Rate proposal as $+1$ (Plausible), $0$ (Uncertain), or $-1$ (Implausible) and provide supporting arguments for the rating.
 2. **Strategic Alignment:** Describe whether the outcome is `beneficial`, `neutral`, or `hostile` to the voter. This is narrative metadata, not an additional mechanical constraint on vote direction.
 3. **Vote Adjustment:** May shift the final vote by at most $\pm 1$ step from baseline. The resulting `final_vote` is clamped to $[-1, +1]$:
    * $+1 \to +1$ (unaltered beneficial)
@@ -229,7 +230,7 @@ PeerEvaluation = {
 }
 ```
 
-### 3.4 Run Request, Result, and Turn Record (Interface Contract v1.0.0)
+### 3.4 Run Request, Result, and Turn Record (Interface Contract v1.1.0)
 
 The caller supplies a full world state and a positive number of turns, with optional spark-table overrides, actor order for the first round, and random seed. If `first_round_order` is omitted, the engine creates a random permutation; when `seed` is supplied, that permutation is reproducible. The supplied order must contain every actor ID exactly once. The engine repeats that order until the requested number of turns has completed.
 
