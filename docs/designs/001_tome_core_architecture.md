@@ -14,7 +14,7 @@
 
 | Spec Version | Summary |
 | :--- | :--- |
-| 1.1.0 | Revision under human review: standardized TriO and actor terminology; replaced persistent posture and step-dice with a per-turn d6; provided default spark tables with complete caller overrides and tier-independent random selection; simplified resolution to 2d6 plus peer votes against 7+; deferred actor traits and retained canon-only grounding; removed mechanical trackers, exhaustion, boons, and outcome bands; added optional pre-roll umpire rejection of illogical shifts and mandatory umpire resolution of failures into new canon consequences based on the lowest final peer votes; required proposals to be new to canon so every resolved turn, Success or Failure, adds exactly one new fact; removed the descriptive `goal_alignment` field from peer evaluations; bumped the interface contract to 1.1.0 for the changed actor schema, binary outcome, umpire callbacks, and `failure_resolution`/`umpire_rejections` records, as a draft pending approval. |
+| 1.1.0 | Revision under human review: standardized TriO and actor terminology; replaced persistent posture and step-dice with a per-turn d6; provided default spark tables with complete caller overrides and tier-independent random selection; simplified resolution to 2d6 plus peer votes against 7+; deferred actor traits and retained canon-only grounding; removed mechanical trackers, exhaustion, boons, and outcome bands; added optional pre-roll umpire rejection of illogical shifts and mandatory umpire resolution of failures into new canon consequences based on the lowest final peer votes; required proposals to be new to canon so every resolved turn, Success or Failure, adds exactly one new fact; removed the descriptive `goal_alignment` field from peer evaluations; defined the `Actor` and `TrioTier` types, distinguished the posture die from its TriO tier, and removed the constant `posture_die` field; bumped the interface contract to 1.1.0 for the changed actor schema, binary outcome, umpire callbacks, and `failure_resolution`/`umpire_rejections` records, as a draft pending approval. |
 | 1.0.0 | Retained the engine mechanics and defined a transport-neutral multi-turn execution contract. Removed UI, hosting, authentication, deployment, persistence, and provider-selection requirements from the active scope. |
 
 #### Deferred UI / Execution-Bridge Scope
@@ -33,7 +33,9 @@ $$\mathcal{M}(\text{WorldState}_{t}, \text{RunRequest}) \longrightarrow (\text{W
 
 ### Goals
 
-* **Deterministic Mechanical Core:** Each turn uses a d6 for posture (1-3 Obvious, 4-5 Option, 6 Odd), d66 lookups on two randomly selected tables independently of posture, and 2d6 plus peer votes against target number 7. Tables come from built-in defaults or a complete caller override. A supplied seed fixes the engine-controlled random sequence for the same engine/runtime version.
+* **Deterministic Mechanical Core:** Each turn rolls a d6 posture die for the TriO tier (1-3 Obvious, 4-5 Option, 6 Odd), d66 lookups on two randomly selected tables independently of the tier, and 2d6 plus peer votes against target number 7.
+  Tables come from built-in defaults or a complete caller override.
+  A supplied seed fixes the engine-controlled random sequence for the same engine/runtime version.
 * **Narrative-Only Trackers:** Actor conditions and capabilities are narrative facts, not mechanical meters. There are no persistent posture levels, consumable capability pools, recovery mechanics, or automatic bonuses from trackers. Turn and round counters record simulation time only.
 * **Strict Epistemic Grounding (The Linter Gate):** Proposal generators and peer reviewers cannot introduce ungrounded setting details or arbitrary voting shifts. Citation checks enforce whitespace-stripped exact matching against existing `canon_facts` only; they do not prove that the argument is logical. The human umpire may reject illogical vote shifts through an optional pre-resolution review callback.
 * **Transport-Neutral Execution Contract:** Define versioned input, output, turn-order, validation, and failure semantics without prescribing a UI, transport, hosting provider, or persistence mechanism.
@@ -65,17 +67,20 @@ A separate umpire-controlled failure resolver must provide a consequence after e
 These callables are not serialized into `RunRequest`; collecting user input, provider selection, credentials, and transport remain outside this contract.
 Mechanics, validation, turn ordering, state transitions, and result records remain governed by this specification.
 
-### 2.1 Per-Turn d6 Posture
+### 2.1 Per-Turn Posture Die & TriO Tier
 
-Every actor uses the same d6 to select a posture for its current turn:
+Every actor rolls the same d6, the *posture die*, at the start of its turn.
+The result is the turn's *TriO tier*:
 
-| d6 Roll | Posture | Meaning |
+| d6 Roll | TriO Tier | Meaning |
 | :---: | :--- | :--- |
 | 1-3 | Obvious | A predictable initiative given established canon and the actor's agenda. |
 | 4-5 | Option | A lateral but strategically logical initiative. |
 | 6 | Odd | An atypical, radical, or unexpected initiative. |
 
-Posture is a turn-local result, not a persistent actor tracker. It is recorded as `trio_tier` in the proposal for compatibility with the draft contract's terminology. Every turn rolls anew; prior successes, failures, and narrative conditions do not change the die or its thresholds.
+The roll is recorded as `posture_roll` and the tier as `trio_tier` in the proposal.
+The tier is a turn-local result, not a persistent actor tracker.
+Every turn rolls anew; prior successes, failures, and narrative conditions do not change the die or its thresholds.
 
 ### 2.2 Dual Spark Table Seeding
 
@@ -210,11 +215,23 @@ All listed fields are required except fields explicitly marked optional elsewher
 }
 ```
 
+`Actor` is one element of `WorldState.actors`; the schema above is authoritative:
+
+```text
+Actor = {
+  id: non-empty string, unique within WorldState.actors,
+  name: string,
+  agenda: string
+}
+```
+
 For every actor, `id` must be non-empty and unique in the world state. Actor traits are deferred from this revision; actors contain only `id`, `name`, and `agenda`. Name and agenda supply narrative context, not grounding evidence. Actor capabilities or conditions may be cited only if stated in `canon_facts`. Legacy payloads containing deferred or removed fields must be adapted by the caller; undeclared fields reject the run as `InvalidRunRequestError`.
 
 ### 3.2 Proposal Contract (Stage 3)
 
 ```text
+TrioTier = "Obvious" | "Option" | "Odd"
+
 SupportingPro = {
   source_type: "canon_fact",
   source_ref: string,
@@ -223,9 +240,8 @@ SupportingPro = {
 
 Proposal = {
   active_actor_id: string,
-  posture_die: "d6",
   posture_roll: integer in [1, 6],
-  trio_tier: "Obvious" | "Option" | "Odd",
+  trio_tier: TrioTier,
   spark_tags: string[] with exactly 2 tags from distinct randomly selected tables,
   world_change_statement: non-whitespace string not already in canon_facts,
   supporting_pros: SupportingPro[1..2] with at least 1 grounded entry after pruning
@@ -235,7 +251,6 @@ Proposal = {
 ```json
 {
   "active_actor_id": "actor_iron_choir",
-  "posture_die": "d6",
   "posture_roll": 6,
   "trio_tier": "Odd",
   "spark_tags": ["Focus:Resource access", "Method:Public declaration"],
@@ -484,7 +499,6 @@ In this example, the base roll of 7 receives a -1 peer modifier, so the proposal
       "active_actor_id": "actor_iron_choir",
       "proposal": {
         "active_actor_id": "actor_iron_choir",
-        "posture_die": "d6",
         "posture_roll": 6,
         "trio_tier": "Odd",
         "spark_tags": ["Focus:Resource access", "Method:Public declaration"],
@@ -550,7 +564,7 @@ The record explains why the final state changed; it is not a UI-formatted dossie
 
 `peer_evaluations` contains exactly one evaluation for each non-active actor, in the order those actors appear in the input `WorldState`. `state_changes` contains each changed top-level `WorldState` field exactly once, ordered by ascending JSON Pointer. Each entry's `before` and `after` are the complete JSON values of that field; `reason` describes every deterministic engine rule that affected it, in execution order. These values represent the net change at the end of the turn, including counter updates. A completed run contains exactly `turn_count` records, including failed attempts; errors use one of the `RunError` types and never include a partial result.
 
-The proposal's `active_actor_id` must equal the actor taking the turn; its die is always `d6`, its roll is the engine's turn-local posture roll, and its tier must match that roll. Its two spark tags must match the d66 entries from the independently selected distinct tables in selection order, not a tier-specific pairing. Each peer evaluation's voter ID must identify a distinct non-active actor. A caller-supplied state must contain every field in Section 3.1; actor IDs are non-empty and unique. All contract objects reject undeclared fields.
+The proposal's `active_actor_id` must equal the actor taking the turn; its `posture_roll` is the engine's turn-local posture-die roll, and its `trio_tier` must match that roll. Its two spark tags must match the d66 entries from the independently selected distinct tables in selection order, not a tier-specific pairing. Each peer evaluation's voter ID must identify a distinct non-active actor. A caller-supplied state must contain every field in Section 3.1; actor IDs are non-empty and unique. All contract objects reject undeclared fields.
 
 ### 3.5 Engine-Side Adapters & Umpire Callbacks
 
@@ -565,7 +579,7 @@ ProposalDraft = {
 
 ProposalGenerator(
   active_actor: Actor,
-  tier: PostureTier,
+  trio_tier: TrioTier,
   spark_tags: string[],
   world_state: WorldState
 ) -> ProposalDraft
@@ -593,7 +607,7 @@ FailureResolver(
 ) -> FailureResolution
 ```
 
-The proposal generator returns only a `ProposalDraft`; the engine creates the complete `Proposal` by attaching the active actor ID, posture die and roll, tier, and spark tags already resolved for that turn. Each adapter must return the declared schema and must not mutate its arguments. The runner supplies isolated snapshots of the current state and proposal. Provider/network errors or malformed output become `ProposalGenerationError` or `PeerReviewError`. The engine applies grounding and voting validation to returned values. It prunes ungrounded proposal pros; if no grounded pro remains, it raises `InvalidProposalError` without automatically retrying. Any adapter retry policy is outside the engine contract. Engine errors expose the stable code and message represented by `RunFailure`; an execution bridge maps those values into its chosen transport response without returning partial state.
+The proposal generator returns only a `ProposalDraft`; the engine creates the complete `Proposal` by attaching the active actor ID, posture roll, TriO tier, and spark tags already resolved for that turn. Each adapter must return the declared schema and must not mutate its arguments. The runner supplies isolated snapshots of the current state and proposal. Provider/network errors or malformed output become `ProposalGenerationError` or `PeerReviewError`. The engine applies grounding and voting validation to returned values. It prunes ungrounded proposal pros; if no grounded pro remains, it raises `InvalidProposalError` without automatically retrying. Any adapter retry policy is outside the engine contract. Engine errors expose the stable code and message represented by `RunFailure`; an execution bridge maps those values into its chosen transport response without returning partial state.
 
 If configured and at least one valid shifted vote remains after mechanical checks, the runner invokes `UmpireReview` once before computing the turn's modifier. It receives isolated snapshots of the proposal, all mechanically validated evaluations, and the pre-resolution world state. `turn_index` identifies the turn being resolved (`world_state.turn_index + 1`). The callback conveys the human umpire's decisions, not additional peer-agent votes; it must not mutate its arguments or consume the engine's RNG.
 
@@ -635,7 +649,8 @@ Non-blank statements retain their original text.
 ## 4. Invariants & Rules
 
 * **Invariant 1 (Run Turn Order):** The caller may supply `first_round_order`, which must be a permutation of all actor IDs. If omitted, the engine creates a random permutation; a supplied seed makes that order reproducible. This order remains fixed and repeats until the requested turns are complete. Every new `RunRequest` starts at the beginning of its own order; partial rounds are not resumed across requests.
-* **Invariant 2 (Per-Turn Posture):** Every turn rolls one d6: 1-3 means Obvious, 4-5 means Option, and 6 means Odd. The selected posture is turn-local; no actor condition changes this mapping.
+* **Invariant 2 (Per-Turn TriO Tier):** Every turn rolls the d6 posture die: 1-3 means Obvious, 4-5 means Option, and 6 means Odd.
+  The TriO tier is turn-local; no actor condition changes this mapping.
 * **Invariant 3 (Vote Adjustment Limits & Bounds):** Both `baseline_plausibility` and `final_vote` are always $-1$, $0$, or $+1$.
   A shift $(\text{final\_vote} - \text{baseline\_plausibility})$ may be at most one step.
   A two-step shift (from $+1$ to $-1$, or from $-1$ to $+1$) is invalid, and the vote reverts to its baseline.
@@ -692,8 +707,8 @@ The engine accepts a `RunRequest` as defined in Section 3.4: a complete `WorldSt
 1. Validate the complete world state, unique actor IDs, positive `turn_count`, optional order permutation, and any supplied complete `spark_tables` override before executing any turn. A run requires at least one actor. Invalid supplied tables fail validation; they do not trigger a fallback.
 2. Select the built-in `trio-d66-v1` tables if `spark_tables` is omitted; otherwise use the valid caller-supplied set unchanged. Create one `random.Random` instance from the non-negative `seed`, or system entropy when omitted. Select the first-round order from the supplied permutation, or shuffle the actor IDs with that instance.
 3. Execute exactly `turn_count` turns, advancing through the order and restarting at its first actor after each complete pass:
-   a. Roll one posture d6 and map it to Obvious/Option/Odd. Independently sample two distinct tables, roll one d66 entry from each, and construct their spark tags in selection order.
-   b. Generate a `ProposalDraft` through the engine-side proposal-generation integration; the engine attaches the already-resolved active actor ID, posture die/roll, tier, and spark tags to form the `Proposal`.
+   a. Roll the posture die and map the result to its TriO tier. Independently sample two distinct tables, roll one d66 entry from each, and construct their spark tags in selection order.
+   b. Generate a `ProposalDraft` through the engine-side proposal-generation integration; the engine attaches the already-resolved active actor ID, posture roll, TriO tier, and spark tags to form the `Proposal`.
    c. Reject a proposal statement that already matches a normalized canon fact with `InvalidProposalError`.
       Validate and prune proposal pros against `canon_facts` only; if none remain, fail with `InvalidProposalError`.
    d. Obtain one peer evaluation from every non-active actor, then apply shift and canon-fact grounding validation without consuming any fact.
@@ -757,7 +772,7 @@ The successful output is the versioned `RunResult` in Section 3.4. The engine do
 
 ### Unit Tests (`tests/test_tome_core.py`)
 
-* **Posture d6 Mapping:** Exhaustively assert faces 1-3 map to Obvious, 4-5 to Option, and 6 to Odd; every actor uses the same mapping. Assert no tier filters or replaces the random table selection.
+* **Posture Die to TriO Tier Mapping:** Exhaustively assert faces 1-3 map to Obvious, 4-5 to Option, and 6 to Odd; every actor uses the same mapping. Assert no tier filters or replaces the random table selection.
 * **Seeded Random Sequence:** Assert golden vectors for seeded actor-order shuffling, posture d6, two-table sampling, both d66 lookups, and resolution dice. Verify the canonical sampling list, sample order, and `randint(1, 6)` sequence, including independence from JSON key order.
 * **Spark Table Defaults and Overrides:** Assert omitted `spark_tables` selects `trio-d66-v1`; valid complete overrides produce exact supplied `<TableName>:<entry>` tags and source `request`. Reject null payloads, missing/extra table names or d66 keys, and non-string/blank entries without falling back to defaults. Table-source selection must not consume RNG draws or alter the table-sampling procedure.
 * **Narrative Spark Selection:** Assert each turn selects two distinct tables, all ten unordered pairs are eligible under all three tiers, and later turns may reuse tables. Verify the generator receives both entries and the tier together; sparks alone cannot ground supporting arguments or vote shifts.
