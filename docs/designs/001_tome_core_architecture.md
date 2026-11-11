@@ -102,7 +102,8 @@ A proposal is a structured argument:
 
 Every non-active actor evaluates the proposal as an independent adjudicator:
 
-1. **Baseline Plausibility:** Rate the proposal as $+1$ (Plausible), $0$ (Uncertain), or $-1$ (Implausible), and give arguments for that rating.
+1. **Baseline Plausibility:** Rate the proposal as $+1$ (Plausible), $0$ (Uncertain), or $-1$ (Implausible).
+   The voter gives arguments for its submitted vote, including any shift made in the next step.
 2. **Vote Adjustment:** A voter may shift its final vote by at most one step up or down from its baseline.
    The shift lets an actor tilt how plausible it claims the proposal is according to its own goals, rather than its honest assessment alone.
    Shifts in either direction are allowed.
@@ -263,6 +264,8 @@ PeerEvaluation = {
 ```
 
 `public_argument` retains the peer's ordinary pro/con reasoning.
+It is the voter's reasoning for its submitted `final_vote`, including any shift.
+It is not rewritten if the shift is reverted; `umpire_rejections` records the reversion, and the umpire judges the argument's fit when resolving a failure.
 It is a possible source for a failure consequence, not a fact merely because the peer states it.
 The human umpire decides whether it can be used directly, must be restated, or is unsuitable as a failure explanation.
 
