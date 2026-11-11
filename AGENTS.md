@@ -5,7 +5,7 @@ This document specifies repository calibration, architectural invariants, and ag
 ## 1. Project Overview & Architectural Boundaries
 
 * **Repository Identity:** `tome` is a standalone, serverless simulation engine for multi-agent complex systems where fundamental behavioral laws are incomplete or uncertain, providing a formal computational testbed for human umpires and analysts to explore plausible realisations of multi-actor interactions.
-* **Parent Concept:** Integrates **Chris Engle Matrix Games** (structured epistemic argumentation and probability resolution under uncertainty) with **Cezar Capacle's TriO framework** (structural posture step-dice and dual spark tables for non-mode-collapsing divergence).
+* **Parent Concept:** Integrates **Chris Engle Matrix Games** (structured epistemic argumentation and probability resolution under uncertainty) with **Cezar Capacle's Triple-O framework** (structural posture step-dice and dual spark tables for non-mode-collapsing divergence).
 * **GitOps State Flow:** Pure state transformer:
   $$\mathcal{M}(\text{WorldState}_{t}, \text{Interventions}) \longrightarrow \text{WorldState}_{t+1} + \text{SimulationDossier}$$
 * **Core Philosophy:**

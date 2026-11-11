@@ -174,7 +174,7 @@ ruff format --check .
 ## Attribution & Acknowledgements
 
 This software implements game mechanics derived from:
-- TriO by Cezar Capacle (https://capacle.itch.io/triple-o), licensed under CC BY-SA 4.0.
+- Triple-O by Cezar Capacle (https://capacle.itch.io/triple-o), licensed under CC BY-SA 4.0.
 - Engle Matrix Games, invented by Chris Engle, licensed under CC BY-SA 4.0. Matrix Games were invented by Chris Engle.
 
 ---
