@@ -14,7 +14,7 @@
 
 | Spec Version | Summary |
 | :--- | :--- |
-| 1.1.0 | Revision under human review: standardized TriO and actor terminology; replaced persistent posture and step-dice with a per-turn d6; provided default spark tables with complete caller overrides and tier-independent random selection; simplified resolution to 2d6 plus peer votes against 7+; deferred actor traits and retained canon-only grounding; removed mechanical trackers, exhaustion, boons, and outcome bands; added optional pre-roll umpire rejection of illogical shifts and mandatory umpire resolution of failures into new canon consequences based on the lowest final peer votes; required proposals to be new to canon so every resolved turn, Success or Failure, adds exactly one new fact; bumped the interface contract to 1.1.0 for the changed actor schema, binary outcome, umpire callbacks, and `failure_resolution`/`umpire_rejections` records, as a draft pending approval. |
+| 1.1.0 | Revision under human review: standardized TriO and actor terminology; replaced persistent posture and step-dice with a per-turn d6; provided default spark tables with complete caller overrides and tier-independent random selection; simplified resolution to 2d6 plus peer votes against 7+; deferred actor traits and retained canon-only grounding; removed mechanical trackers, exhaustion, boons, and outcome bands; added optional pre-roll umpire rejection of illogical shifts and mandatory umpire resolution of failures into new canon consequences based on the lowest final peer votes; required proposals to be new to canon so every resolved turn, Success or Failure, adds exactly one new fact; removed the descriptive `goal_alignment` field from peer evaluations; bumped the interface contract to 1.1.0 for the changed actor schema, binary outcome, umpire callbacks, and `failure_resolution`/`umpire_rejections` records, as a draft pending approval. |
 | 1.0.0 | Retained the engine mechanics and defined a transport-neutral multi-turn execution contract. Removed UI, hosting, authentication, deployment, persistence, and provider-selection requirements from the active scope. |
 
 #### Deferred UI / Execution-Bridge Scope
@@ -102,18 +102,23 @@ A proposal is a structured argument:
 
 Every non-active actor evaluates the proposal as an independent adjudicator:
 
-1. **Baseline Plausibility:** Rate proposal as $+1$ (Plausible), $0$ (Uncertain), or $-1$ (Implausible) and provide supporting arguments for the rating.
-2. **Strategic Alignment:** Describe whether the outcome is `beneficial`, `neutral`, or `hostile` to the voter. This is narrative metadata, not an additional mechanical constraint on vote direction.
-3. **Vote Adjustment:** May shift the final vote by at most $\pm 1$ step from baseline. The resulting `final_vote` is clamped to $[-1, +1]$:
-   * $+1 \to +1$ (unaltered beneficial)
-   * $+1 \to 0$ (hostile shift down)
-   * $0 \to -1$ (hostile shift down)
-   * $-1 \to 0$ (beneficial shift up)
-   * $0 \to +1$ (beneficial shift up)
-   * An individual voter's `final_vote` is strictly bounded within $\{-1, 0, +1\}$.
-4. **Grounding & Umpire Review:** If a shift is attempted ($\text{shift} \neq 0$), the voter MUST cite a valid anchor from `canon_facts`. If the anchor is missing or invalid, or the human umpire (the user of the engine) deems the reasoning for the shift illogical, the vote reverts to baseline. Citation validity is checked mechanically; logical rejection is the umpire's decision, not an automatic engine judgement. Facts are reusable references: citing one does not consume or mechanically change it.
+1. **Baseline Plausibility:** Rate the proposal as $+1$ (Plausible), $0$ (Uncertain), or $-1$ (Implausible), and give arguments for that rating.
+2. **Vote Adjustment:** A voter may shift its final vote by at most one step up or down from its baseline.
+   The shift lets an actor tilt how plausible it claims the proposal is according to its own goals, rather than its honest assessment alone.
+   Shifts in either direction are allowed.
+   The permitted shifts are $+1 \to 0$, $0 \to -1$, $0 \to +1$, and $-1 \to 0$.
+   Every vote is always $-1$, $0$, or $+1$, before and after any shift.
+   A shift of more than one step is invalid and the vote reverts to its baseline (Invariant 3).
+3. **Grounding & Umpire Review:** A shifted vote must cite a valid anchor from `canon_facts`.
+   If the anchor is missing or invalid, the vote reverts to its baseline.
+   If the shift is cited correctly but its reasoning is illogical, the human umpire (the user of the engine) may reject it, and the vote reverts to its baseline.
+   Citation validity is checked mechanically; rejecting illogical reasoning is the umpire's decision, not an automatic engine judgement.
+   Facts are reusable references: citing one does not consume or mechanically change it.
 
-The numeric difference between final vote and baseline determines whether a shift was attempted; the adapter's `biased_shift_applied` flag does not authorize or prevent one. After mechanical validation and any umpire review, the engine sets that flag to whether a non-zero shift remains. Invalid or umpire-rejected shifts revert to baseline with the flag false and anchor null; unchanged votes also have the flag false and anchor null. Remaining shifted votes retain the normalized anchor. `goal_alignment` remains descriptive for all three values.
+The numeric difference between final vote and baseline determines whether a shift was attempted; the adapter's `biased_shift_applied` flag does not authorize or prevent one.
+After mechanical validation and any umpire review, the engine sets that flag to whether a non-zero shift remains.
+Invalid or umpire-rejected shifts revert to baseline with the flag false and anchor null; unchanged votes also have the flag false and anchor null.
+Remaining shifted votes retain the normalized anchor.
 
 Correctly cited shifts proceed unless the umpire rejects them through the optional pre-roll callback in Section 3.5.
 There is no mandatory vote-approval pause when that callback is absent.
@@ -250,7 +255,6 @@ Proposal = {
 PeerEvaluation = {
   voter_actor_id: string,
   baseline_plausibility: integer in [-1, 1],
-  goal_alignment: "beneficial" | "neutral" | "hostile",
   biased_shift_applied: boolean,
   cited_anchor: string | null,
   final_vote: integer in [-1, 1],
@@ -266,7 +270,6 @@ The human umpire decides whether it can be used directly, must be restated, or i
 {
   "voter_actor_id": "actor_dock_syndicate",
   "baseline_plausibility": 1,
-  "goal_alignment": "hostile",
   "biased_shift_applied": true,
   "cited_anchor": "The conduit is open.",
   "final_vote": 0,
@@ -495,7 +498,6 @@ In this example, the base roll of 7 receives a -1 peer modifier, so the proposal
         {
           "voter_actor_id": "actor_dock_syndicate",
           "baseline_plausibility": -1,
-          "goal_alignment": "hostile",
           "biased_shift_applied": false,
           "cited_anchor": null,
           "final_vote": -1,
@@ -631,7 +633,9 @@ Non-blank statements retain their original text.
 
 * **Invariant 1 (Run Turn Order):** The caller may supply `first_round_order`, which must be a permutation of all actor IDs. If omitted, the engine creates a random permutation; a supplied seed makes that order reproducible. This order remains fixed and repeats until the requested turns are complete. Every new `RunRequest` starts at the beginning of its own order; partial rounds are not resumed across requests.
 * **Invariant 2 (Per-Turn Posture):** Every turn rolls one d6: 1-3 means Obvious, 4-5 means Option, and 6 means Odd. The selected posture is turn-local; no actor condition changes this mapping.
-* **Invariant 3 (Vote Adjustment Limits & Bounds):** A peer evaluation shift $(\text{final\_vote} - \text{baseline\_plausibility})$ cannot exceed $\pm 1$. Any deviation $> 1$ or $< -1$ is invalid and reverts to baseline. Both `baseline_plausibility` and `final_vote` are strictly constrained to $\{-1, 0, +1\}$.
+* **Invariant 3 (Vote Adjustment Limits & Bounds):** Both `baseline_plausibility` and `final_vote` are always $-1$, $0$, or $+1$.
+  A shift $(\text{final\_vote} - \text{baseline\_plausibility})$ may be at most one step.
+  A two-step shift (from $+1$ to $-1$, or from $-1$ to $+1$) is invalid, and the vote reverts to its baseline.
 * **Invariant 4 (Grounding & Umpire Rejection):** Any non-zero vote shift $(\text{shift} \neq 0)$ requires `cited_anchor` (after stripping whitespace and enclosing quotation marks) to match exactly an existing string in `canon_facts`. A missing/invalid anchor or human-umpire rejection of the reasoning discards the shift: `final_vote` reverts to `baseline_plausibility`, the shift flag becomes false, and the anchor is cleared. Correctly cited shifts remain unless explicitly rejected by the optional callback. Valid anchors remain reusable across turns.
 * **Invariant 5 (Proposal Pro Grounding Gate):** Each entry in `supporting_pros` must use `source_type: "canon_fact"` and its normalized `source_ref` must match a known canon fact. Ungrounded pros are pruned. The proposal proceeds only if at least 1 grounded pro remains; otherwise, the run fails with `InvalidProposalError` and the engine does not regenerate the proposal.
 * **Invariant 6 (Narrative-Only Trackers):** Rumors and actor conditions carry narrative information only. They are not consumed, recovered, stepped, or used as automatic numeric modifiers. Grounded peer votes are the only adjustment to the resolution roll.
@@ -764,7 +768,8 @@ The successful output is the versioned `RunResult` in Section 3.4. The engine do
   Callback decisions consume no RNG draws.
 * **Umpire Audit and Errors:** Assert rejected evaluations, original anchors, and user reasons are retained independently in peer order. Reject duplicate/unknown voters, votes already at baseline, blank reasons, malformed returns, and callback failures/cancellation with `UmpireReviewError`; preserve the submitted state and return no partial result.
 * **Proposal and Evaluation Schemas:** Assert adapter output validation, engine attachment of turn mechanics to `ProposalDraft`, and one ordered peer evaluation per non-active actor.
-* **Voting Metadata:** Assert alignment is descriptive and normalized shift flags/anchors follow the numeric shift, grounding checks, and any umpire rejections, including inconsistent adapter flags.
+* **Voting Metadata:** Assert normalized shift flags/anchors follow the numeric shift, grounding checks, and any umpire rejections, including inconsistent adapter flags.
+  Reject a peer evaluation containing the removed `goal_alignment` field as an undeclared field.
 * **Closed State Schema:** Assert unknown fields are rejected at both world-state and actor-object levels.
 * **Non-Blank Proposals:** Reject empty and whitespace-only statements before any resolution roll or canon insertion.
 * **New Proposals:** Reject a proposal statement matching an existing canon fact after whitespace/outer-quote normalization with `InvalidProposalError`.
