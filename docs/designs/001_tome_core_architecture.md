@@ -14,7 +14,7 @@
 
 | Spec Version | Summary |
 | :--- | :--- |
-| 1.1.0 | Revision under human review: standardized TriO and actor terminology; replaced persistent posture and step-dice with a per-turn d6; provided default spark tables with complete caller overrides and tier-independent random selection; simplified resolution to 2d6 plus peer votes against 7+; deferred actor traits and retained canon-only grounding; removed mechanical trackers, exhaustion, boons, and outcome bands; added optional pre-roll umpire rejection of illogical shifts and mandatory umpire resolution of failures into new canon consequences based on the lowest final peer votes; bumped the interface contract to 1.1.0 for the changed actor schema, binary outcome, umpire callbacks, and `failure_resolution`/`umpire_rejections` records, as a draft pending approval. |
+| 1.1.0 | Revision under human review: standardized TriO and actor terminology; replaced persistent posture and step-dice with a per-turn d6; provided default spark tables with complete caller overrides and tier-independent random selection; simplified resolution to 2d6 plus peer votes against 7+; deferred actor traits and retained canon-only grounding; removed mechanical trackers, exhaustion, boons, and outcome bands; added optional pre-roll umpire rejection of illogical shifts and mandatory umpire resolution of failures into new canon consequences based on the lowest final peer votes; required proposals to be new to canon so every resolved turn, Success or Failure, adds exactly one new fact; bumped the interface contract to 1.1.0 for the changed actor schema, binary outcome, umpire callbacks, and `failure_resolution`/`umpire_rejections` records, as a draft pending approval. |
 | 1.0.0 | Retained the engine mechanics and defined a transport-neutral multi-turn execution contract. Removed UI, hosting, authentication, deployment, persistence, and provider-selection requirements from the active scope. |
 
 #### Deferred UI / Execution-Bridge Scope
@@ -38,8 +38,10 @@ $$\mathcal{M}(\text{WorldState}_{t}, \text{RunRequest}) \longrightarrow (\text{W
 * **Strict Epistemic Grounding (The Linter Gate):** Proposal generators and peer reviewers cannot introduce ungrounded setting details or arbitrary voting shifts. Citation checks enforce whitespace-stripped exact matching against existing `canon_facts` only; they do not prove that the argument is logical. The human umpire may reject illogical vote shifts through an optional pre-resolution review callback.
 * **Transport-Neutral Execution Contract:** Define versioned input, output, turn-order, validation, and failure semantics without prescribing a UI, transport, hosting provider, or persistence mechanism.
 * **Isolated Provider Boundary:** Proposal generation and peer review may be supplied by engine-side adapters; this specification does not select an LLM provider or expose provider credentials through the contract.
-* **Narrative Progression on Failure:** Every failed turn adds a new, umpire-resolved consequence to canon instead of merely rejecting the proposal.
-  Later actors observe that consequence immediately.
+* **Narrative Progression Every Turn:** Every resolved turn adds exactly one new fact to canon.
+  Success adds the proposal, which must be new to canon.
+  Failure adds a new, umpire-resolved consequence instead of merely rejecting the proposal.
+  Later actors observe that new fact immediately.
 
 ### Non-Goals
 
@@ -93,6 +95,7 @@ $d66$ uses one-based senary (base-six) notation: two digits, each from 1 to 6, i
 
 A proposal is a structured argument:
 * **World-Change Statement:** A single declarative assertion specifying an altered fact in the world benefiting the active actor.
+  It must be new: it may not match an existing canon fact after anchor-style normalization.
 * **Supporting Arguments (Pros):** 1 to 2 arguments explicitly grounded in existing `canon_facts`.
 
 ### 2.4 Peer Review & Vote Adjustment
@@ -126,10 +129,12 @@ Resolution roll: $2d6 + \text{Net Modifier}$ against target number 7:
 
 | $2d6 + \text{Mod}$ | Outcome | Narrative State Mutation |
 | :---: | :--- | :--- |
-| **7+** | **Success** | Append the proposal's world-change statement to `canon_facts`. |
+| **7+** | **Success** | Append the proposal's world-change statement, already validated as new, to `canon_facts`. |
 | **Below 7** | **Failure** | Do not enact the proposal; instead add a new, umpire-resolved failure consequence based on the lowest final peer votes to `canon_facts`. |
 
 There are no critical success/failure bands or secondary boons.
+Both outcomes change the world: every resolved turn appends exactly one new fact to `canon_facts`.
+On success, the proposal itself is the new fact.
 On failure, the selected or umpire-restated reason becomes a new canon consequence explaining why the proposal did not occur.
 `active_rumors` and actor records remain unchanged by resolution.
 Every resolved turn advances time regardless of success or failure.
@@ -216,7 +221,7 @@ Proposal = {
   posture_roll: integer in [1, 6],
   trio_tier: "Obvious" | "Option" | "Odd",
   spark_tags: string[] with exactly 2 tags from distinct randomly selected tables,
-  world_change_statement: non-whitespace string,
+  world_change_statement: non-whitespace string not already in canon_facts,
   supporting_pros: SupportingPro[1..2] with at least 1 grounded entry after pruning
 }
 ```
@@ -549,7 +554,7 @@ None is part of the serialized `RunRequest`; how a UI or bridge gathers the huma
 
 ```text
 ProposalDraft = {
-  world_change_statement: non-whitespace string,
+  world_change_statement: non-whitespace string not already in canon_facts,
   supporting_pros: SupportingPro[1..2]
 }
 
@@ -615,7 +620,10 @@ It does not retry or publish partial state on this error.
 
 The generator receives the TriO tier and both selected spark tags together as the narrative starting cues. It must not replace the sampled tables with a tier-specific pair or treat their entries as grounding evidence. The active actor and current world state provide narrative context; only `canon_facts` provides grounding references.
 
-An empty or whitespace-only world-change statement is malformed proposal output and raises `ProposalGenerationError` before adjudication; it must never enter canon. Non-blank statements retain their original text.
+An empty or whitespace-only world-change statement is malformed proposal output and raises `ProposalGenerationError` before adjudication; it must never enter canon.
+A statement that matches an existing canon fact after anchor-style normalization raises `InvalidProposalError` before peer review.
+The engine does not request regeneration.
+Non-blank statements retain their original text.
 
 ---
 
@@ -628,7 +636,8 @@ An empty or whitespace-only world-change statement is malformed proposal output 
 * **Invariant 5 (Proposal Pro Grounding Gate):** Each entry in `supporting_pros` must use `source_type: "canon_fact"` and its normalized `source_ref` must match a known canon fact. Ungrounded pros are pruned. The proposal proceeds only if at least 1 grounded pro remains; otherwise, the run fails with `InvalidProposalError` and the engine does not regenerate the proposal.
 * **Invariant 6 (Narrative-Only Trackers):** Rumors and actor conditions carry narrative information only. They are not consumed, recovered, stepped, or used as automatic numeric modifiers. Grounded peer votes are the only adjustment to the resolution roll.
 * **Invariant 7 (Binary Resolution):** An adjusted total of 7 or more is Success; a lower total is Failure.
-  Success appends the proposal's world-change statement to canon only if absent.
+  Success appends the proposal's world-change statement to canon.
+  Because proposals are validated as new before peer review, Success always adds a new fact.
   Failure does not enact the proposal; it adds an umpire-resolved failure consequence instead.
   Neither outcome adds rumors automatically.
 * **Invariant 8 (Net Modifier Clamping):** After mechanical checks and any umpire rejections, sum the resulting final peer votes and clamp to $[-3, +3]$ inclusive before rolling $2d6$.
@@ -678,11 +687,12 @@ The engine accepts a `RunRequest` as defined in Section 3.4: a complete `WorldSt
 3. Execute exactly `turn_count` turns, advancing through the order and restarting at its first actor after each complete pass:
    a. Roll one posture d6 and map it to Obvious/Option/Odd. Independently sample two distinct tables, roll one d66 entry from each, and construct their spark tags in selection order.
    b. Generate a `ProposalDraft` through the engine-side proposal-generation integration; the engine attaches the already-resolved active actor ID, posture die/roll, tier, and spark tags to form the `Proposal`.
-   c. Validate and prune proposal pros against `canon_facts` only; if none remain, fail with `InvalidProposalError`.
+   c. Reject a proposal statement that already matches a normalized canon fact with `InvalidProposalError`.
+      Validate and prune proposal pros against `canon_facts` only; if none remain, fail with `InvalidProposalError`.
    d. Obtain one peer evaluation from every non-active actor, then apply shift and canon-fact grounding validation without consuming any fact.
    e. If an umpire callback is configured and any shifted votes remain, obtain its rejections and validate them. Preserve each rejected evaluation and the user's reason, then revert only those shifts to baseline. Without a callback or without rejections, mechanically valid votes proceed.
    f. Sum the post-review final votes, clamp to $[-3, +3]$, roll 2d6, and add the modifier.
-   g. If the adjusted total is at least 7, record Success and append the proposal statement to canon if absent.
+   g. If the adjusted total is at least 7, record Success and append the proposal statement to canon.
    h. Otherwise record Failure, derive the lowest-final-vote candidate set, and obtain a validated `FailureResolution` from the human-umpire-controlled callback.
       Append exactly that new consequence to canon, not the rejected proposal or any additional automatic rumors or boons.
    i. Increment `turn_index`.
@@ -709,7 +719,7 @@ The successful output is the versioned `RunResult` in Section 3.4. The engine do
   The one-actor order completes a round on every resolved turn.
 * **Edge Case 4: Resolution Boundaries:** Total 6 fails; total 7 succeeds.
   Higher and lower totals do not create additional outcome bands.
-  An already-present statement is not duplicated on Success.
+  Success adds the new proposal statement, a turn record, and a time tick.
   Failure produces a new consequence, a turn record, and a time tick after umpire resolution.
 * **Edge Case 5: Invalid Run Request:** A non-positive `turn_count`, negative seed, empty actor set, duplicate/empty actor ID, undeclared tracker field, or `first_round_order` that is not an exact permutation is rejected with `InvalidRunRequestError` before execution. The caller's input state remains untouched.
 * **Edge Case 6: Proposal or Peer-Review Failure:** Any engine-side proposal or peer-review integration failure, including malformed output, aborts with `ProposalGenerationError` or `PeerReviewError`. The engine does not retry. No partial state or turn records are returned.
@@ -730,6 +740,9 @@ The successful output is the versioned `RunResult` in Section 3.4. The engine do
 * **Edge Case 14: Missing or Invalid Failure Decision:** A failed roll without a resolver or valid decision raises `UmpireResolutionError`.
   Choosing a non-lowest or unknown peer source, or a non-null source when no peers exist, is invalid.
   Callback failure/cancellation also aborts the run with no partial result.
+* **Edge Case 15: Proposal Already in Canon:** A proposal whose normalized statement matches an existing canon fact would add nothing on Success.
+  It is rejected with `InvalidProposalError` before peer review, so no peer calls or resolution dice are spent on it.
+  The engine does not request regeneration.
 
 ---
 
@@ -754,9 +767,12 @@ The successful output is the versioned `RunResult` in Section 3.4. The engine do
 * **Voting Metadata:** Assert alignment is descriptive and normalized shift flags/anchors follow the numeric shift, grounding checks, and any umpire rejections, including inconsistent adapter flags.
 * **Closed State Schema:** Assert unknown fields are rejected at both world-state and actor-object levels.
 * **Non-Blank Proposals:** Reject empty and whitespace-only statements before any resolution roll or canon insertion.
+* **New Proposals:** Reject a proposal statement matching an existing canon fact after whitespace/outer-quote normalization with `InvalidProposalError`.
+  Assert this happens before any peer review or resolution dice.
 * **Net Modifier Clamping:** Assert extreme positive and negative vote sums clamp strictly at $[-3, +3]$.
 * **Binary Resolution:** Assert adjusted totals 6 and 7 resolve to Failure and Success respectively; all totals below 7 use the failure-consequence path and all totals at least 7 use the success path.
-  Success enacts the proposal without duplicates and records `failure_resolution: null`.
+  Success appends the new proposal statement to canon and records `failure_resolution: null`.
+  Assert every resolved turn, Success or Failure, increases `canon_facts` by exactly one entry.
   Failure does not enact the proposal; it appends exactly one new umpire-resolved consequence, advances time, and emits a record.
 * **Lowest-Vote Failure Candidates:** Assert candidates are exactly the peers with the lowest post-review final vote, including tied, all-neutral, and all-positive evaluations.
   Verify that pre-roll rejections can change the candidate set.
