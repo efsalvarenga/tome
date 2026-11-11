@@ -14,7 +14,7 @@
 
 | Spec Version | Summary |
 | :--- | :--- |
-| 1.1.0 | Revision under human review: standardized TriO and actor terminology; replaced persistent posture and step-dice with a per-turn d6; provided default spark tables with complete caller overrides and tier-independent random selection; simplified resolution to 2d6 plus peer votes against 7+; deferred actor traits and retained canon-only grounding; removed mechanical trackers, exhaustion, boons, and outcome bands; added optional pre-roll umpire rejection of illogical shifts and mandatory umpire resolution of failures into new canon consequences based on the lowest final peer votes; required proposals to be new to canon so every resolved turn, Success or Failure, adds exactly one new fact; removed the descriptive `goal_alignment` field from peer evaluations; defined the `Actor` and `TrioTier` types, distinguished the posture die from its TriO tier, and removed the constant `posture_die` field; bumped the interface contract to 1.1.0 for the changed actor schema, binary outcome, umpire callbacks, and `failure_resolution`/`umpire_rejections` records, as a draft pending approval. |
+| 1.1.0 | Revision under human review: standardized TriO and actor terminology; replaced persistent posture and step-dice with a per-turn d6; provided default spark tables with complete caller overrides and tier-independent random selection; simplified resolution to 2d6 plus peer votes against 7+; deferred actor traits and retained canon-only grounding; removed mechanical trackers, exhaustion, boons, and outcome bands; added optional pre-roll umpire rejection of illogical shifts and mandatory umpire resolution of failures into new canon consequences based on the lowest final peer votes; required proposals to be new to canon so every resolved turn, Success or Failure, adds exactly one new fact; removed the descriptive `goal_alignment` field from peer evaluations; defined the `Actor` and `TrioTier` types, distinguished the posture die from its TriO tier, and removed the constant `posture_die` field; removed the unused `active_rumors` world-state field; clarified engine-generated state-change reasons and when `MechanicsError` applies; bumped the interface contract to 1.1.0 for the changed actor schema, binary outcome, umpire callbacks, and `failure_resolution`/`umpire_rejections` records, as a draft pending approval. |
 | 1.0.0 | Retained the engine mechanics and defined a transport-neutral multi-turn execution contract. Removed UI, hosting, authentication, deployment, persistence, and provider-selection requirements from the active scope. |
 
 #### Deferred UI / Execution-Bridge Scope
@@ -147,7 +147,7 @@ There are no critical success/failure bands or secondary boons.
 Both outcomes change the world: every resolved turn appends exactly one new fact to `canon_facts`.
 On success, the proposal itself is the new fact.
 On failure, the selected or umpire-restated reason becomes a new canon consequence explaining why the proposal did not occur.
-`active_rumors` and actor records remain unchanged by resolution.
+Actor records remain unchanged by resolution.
 Every resolved turn advances time regardless of success or failure.
 
 ### 2.6 Failure Consequences
@@ -186,15 +186,11 @@ All listed fields are required except fields explicitly marked optional elsewher
   "title": "WorldState",
   "type": "object",
   "additionalProperties": false,
-  "required": ["session_index", "turn_index", "canon_facts", "active_rumors", "actors"],
+  "required": ["session_index", "turn_index", "canon_facts", "actors"],
   "properties": {
     "session_index": { "type": "integer", "minimum": 0 },
     "turn_index": { "type": "integer", "minimum": 0 },
     "canon_facts": {
-      "type": "array",
-      "items": { "type": "string" }
-    },
-    "active_rumors": {
       "type": "array",
       "items": { "type": "string" }
     },
@@ -348,7 +344,7 @@ StateChange = {
   path: string,                        // JSON Pointer to a changed top-level field
   before: JSON value,
   after: JSON value,
-  reason: string                       // deterministic rule-based explanation
+  reason: string                       // engine-generated: the rule or umpire decision behind the change
 }
 
 UmpireRejection = {
@@ -399,7 +395,6 @@ The complete example below demonstrates an override using illustrative caller-su
     "session_index": 0,
     "turn_index": 0,
     "canon_facts": ["The conduit is open."],
-    "active_rumors": [],
     "actors": [
       {
         "id": "actor_iron_choir",
@@ -478,7 +473,6 @@ In this example, the base roll of 7 receives a -1 peer modifier, so the proposal
       "The conduit is open.",
       "The Dock Syndicate blocks the approach, preventing the Iron Choir from claiming the conduit."
     ],
-    "active_rumors": [],
     "actors": [
       {
         "id": "actor_iron_choir",
@@ -562,7 +556,14 @@ If no lowest-vote candidate provides a usable source, or there are no peers, the
 The engine does not infer that judgement from the argument text.
 The record explains why the final state changed; it is not a UI-formatted dossier.
 
-`peer_evaluations` contains exactly one evaluation for each non-active actor, in the order those actors appear in the input `WorldState`. `state_changes` contains each changed top-level `WorldState` field exactly once, ordered by ascending JSON Pointer. Each entry's `before` and `after` are the complete JSON values of that field; `reason` describes every deterministic engine rule that affected it, in execution order. These values represent the net change at the end of the turn, including counter updates. A completed run contains exactly `turn_count` records, including failed attempts; errors use one of the `RunError` types and never include a partial result.
+`peer_evaluations` contains exactly one evaluation for each non-active actor, in the order those actors appear in the input `WorldState`.
+`state_changes` contains each changed top-level `WorldState` field exactly once, ordered by ascending JSON Pointer.
+Each entry's `before` and `after` are the complete JSON values of that field.
+`reason` is engine-generated text naming, in execution order, each engine rule or umpire decision that affected the field.
+For a failure consequence, `reason` refers to the umpire's decision; the umpire's own explanation is in `failure_resolution.rationale`.
+Given the same inputs and umpire decisions, the engine produces the same `reason` text.
+These values represent the net change at the end of the turn, including counter updates.
+A completed run contains exactly `turn_count` records, including failed attempts; errors use one of the `RunError` types and never include a partial result.
 
 The proposal's `active_actor_id` must equal the actor taking the turn; its `posture_roll` is the engine's turn-local posture-die roll, and its `trio_tier` must match that roll. Its two spark tags must match the d66 entries from the independently selected distinct tables in selection order, not a tier-specific pairing. Each peer evaluation's voter ID must identify a distinct non-active actor. A caller-supplied state must contain every field in Section 3.1; actor IDs are non-empty and unique. All contract objects reject undeclared fields.
 
@@ -656,12 +657,14 @@ Non-blank statements retain their original text.
   A two-step shift (from $+1$ to $-1$, or from $-1$ to $+1$) is invalid, and the vote reverts to its baseline.
 * **Invariant 4 (Grounding & Umpire Rejection):** Any non-zero vote shift $(\text{shift} \neq 0)$ requires `cited_anchor` (after stripping whitespace and enclosing quotation marks) to match exactly an existing string in `canon_facts`. A missing/invalid anchor or human-umpire rejection of the reasoning discards the shift: `final_vote` reverts to `baseline_plausibility`, the shift flag becomes false, and the anchor is cleared. Correctly cited shifts remain unless explicitly rejected by the optional callback. Valid anchors remain reusable across turns.
 * **Invariant 5 (Proposal Pro Grounding Gate):** Each entry in `supporting_pros` must use `source_type: "canon_fact"` and its normalized `source_ref` must match a known canon fact. Ungrounded pros are pruned. The proposal proceeds only if at least 1 grounded pro remains; otherwise, the run fails with `InvalidProposalError` and the engine does not regenerate the proposal.
-* **Invariant 6 (Narrative-Only Trackers):** Rumors and actor conditions carry narrative information only. They are not consumed, recovered, stepped, or used as automatic numeric modifiers. Grounded peer votes are the only adjustment to the resolution roll.
+* **Invariant 6 (Narrative-Only Trackers):** Actor conditions exist only as narrative statements in `canon_facts`.
+  They are not consumed, recovered, stepped, or used as automatic numeric modifiers.
+  Grounded peer votes are the only adjustment to the resolution roll.
 * **Invariant 7 (Binary Resolution):** An adjusted total of 7 or more is Success; a lower total is Failure.
   Success appends the proposal's world-change statement to canon.
   Because proposals are validated as new before peer review, Success always adds a new fact.
   Failure does not enact the proposal; it adds an umpire-resolved failure consequence instead.
-  Neither outcome adds rumors automatically.
+  Neither outcome adds any other fact automatically.
 * **Invariant 8 (Net Modifier Clamping):** After mechanical checks and any umpire rejections, sum the resulting final peer votes and clamp to $[-3, +3]$ inclusive before rolling $2d6$.
 * **Invariant 9 (Time Always Advances):** Success and resolved Failure both advance the turn's time counter and remain in `turn_records`.
   A failed roll is not itself an engine error.
@@ -685,6 +688,8 @@ Non-blank statements retain their original text.
   * **Golden Vector (Python 3.11):** With seed `42`, actor IDs `["actor_a", "actor_b"]`, and no supplied order, shuffle produces `["actor_b", "actor_a"]`. The first posture roll is `1` (Obvious), selected tables are `Method` then `Focus`, their d66 rolls are `22` and `61`, and resolution dice are `6` and `6` (base total `12`).
 * **Invariant 15 (Explicit Failure Types):** Invalid requests raise `InvalidRunRequestError`; proposal generation, invalid proposals, peer review, umpire review, umpire failure resolution, and mechanics failures raise their corresponding `RunError` type.
   No engine-level retry or partial result is permitted.
+  `MechanicsError` signals a violated internal engine invariant, such as a die result, table lookup, or counter outside its defined range.
+  It indicates an engine defect, never a legitimate game outcome or invalid caller or adapter input.
 * **Invariant 16 (Narrative Sparks):** Use the built-in default set when the request omits `spark_tables`, or the complete valid caller override when supplied. Every turn uniformly selects two distinct tables from the effective set without using the tier as a selection criterion; all table pairs are available to every tier, and selection resets each turn. The two entries and tier are narrative starting cues only. Drawing a spark never automatically changes world state.
 * **Invariant 17 (Lowest-Vote Failure Candidates):** For Failure, candidates are all non-active actors at the minimum post-review `final_vote`, including neutral or positive minima.
   Multiple lowest-vote candidates require an umpire selection rather than a deterministic or random engine tie-break.
@@ -716,7 +721,7 @@ The engine accepts a `RunRequest` as defined in Section 3.4: a complete `WorldSt
    f. Sum the post-review final votes, clamp to $[-3, +3]$, roll 2d6, and add the modifier.
    g. If the adjusted total is at least 7, record Success and append the proposal statement to canon.
    h. Otherwise record Failure, derive the lowest-final-vote candidate set, and obtain a validated `FailureResolution` from the human-umpire-controlled callback.
-      Append exactly that new consequence to canon, not the rejected proposal or any additional automatic rumors or boons.
+      Append exactly that new consequence to canon, not the rejected proposal or any additional automatic facts or boons.
    i. Increment `turn_index`.
       If every actor in the fixed run order has acted, increment `session_index`.
       Record the proposal, final evaluations, umpire rejections, roll, modifier, outcome, nullable failure resolution, and end-of-turn state delta in a `TurnRecord`.
@@ -809,10 +814,10 @@ The successful output is the versioned `RunResult` in Section 3.4. The engine do
 * **Failure Resolver Errors:** Reject a missing callback/decision, unknown or non-lowest sources, invalid fields, and callback failure/cancellation with `UmpireResolutionError`.
   A one-actor failure requires a null source.
   No invalid decision may become a no-op, automatic tie-break, generated fallback, or partial run result.
-* **Narrative State Preservation:** Assert resolution does not automatically change rumors or actor records or create mechanical trackers and boons.
+* **Narrative State Preservation:** Assert resolution does not automatically change actor records or create mechanical trackers and boons.
   On Failure, only the validated consequence enters canon; unselected arguments and the rejected proposal do not.
-* **State-Change Records:** Assert each changed top-level field appears once, sorted by ascending JSON Pointer, with before/after values and deterministic reason text.
-* **Deferred and Removed Actor Fields:** Reject actor traits and legacy persistent posture/exhaustion fields as undeclared fields; reject `actor_trait` as a supporting argument's source type.
+* **State-Change Records:** Assert each changed top-level field appears once, sorted by ascending JSON Pointer, with before/after values and engine-generated reason text that is identical for identical inputs and umpire decisions.
+* **Deferred and Removed Fields:** Reject actor traits, legacy persistent posture/exhaustion fields, and the removed `active_rumors` world-state field as undeclared fields; reject `actor_trait` as a supporting argument's source type.
 
 ### Integration Tests
 
