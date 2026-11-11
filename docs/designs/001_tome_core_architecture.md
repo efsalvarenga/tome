@@ -14,7 +14,7 @@
 
 | Spec Version | Summary |
 | :--- | :--- |
-| 1.1.0 | Revision under human review: standardized TriO and actor terminology; replaced persistent posture and step-dice with a per-turn d6; provided default spark tables with complete caller overrides and tier-independent random selection; simplified resolution to 2d6 plus peer votes against 7+; deferred actor traits and retained canon-only grounding; removed mechanical trackers, exhaustion, boons, and outcome bands; added optional pre-roll umpire rejection of illogical shifts and mandatory umpire resolution of failures into new canon consequences based on the lowest final peer votes; required proposals to be new to canon so every resolved turn, Success or Failure, adds exactly one new fact; removed the descriptive `goal_alignment` field from peer evaluations; defined the `Actor` and `TrioTier` types, distinguished the posture die from its TriO tier, and removed the constant `posture_die` field; removed the unused `active_rumors` world-state field; clarified engine-generated state-change reasons and when `MechanicsError` applies; bumped the interface contract to 1.1.0 for the changed actor schema, binary outcome, umpire callbacks, and `failure_resolution`/`umpire_rejections` records, as a draft pending approval. |
+| 1.1.0 | Revision under human review: standardized TriO and actor terminology; replaced persistent posture and step-dice with a per-turn d6; provided default spark tables with complete caller overrides and tier-independent random selection; simplified resolution to 2d6 plus peer votes against 7+; deferred actor traits and retained canon-only grounding; removed mechanical trackers, exhaustion, boons, and outcome bands; added optional pre-roll umpire rejection of illogical shifts and mandatory umpire resolution of failures into new canon consequences based on the lowest final peer votes; required proposals to be new to canon so every resolved turn, Success or Failure, adds exactly one new fact; removed the descriptive `goal_alignment` field from peer evaluations; defined the `Actor` and `TrioTier` types, distinguished the posture die from its TriO tier, and removed the constant `posture_die` field; removed the unused `active_rumors` world-state field; clarified engine-generated state-change reasons and when `MechanicsError` applies; required the proposal generator, peer reviewer, and failure resolver to be checked before the first turn; bumped the interface contract to 1.1.0 for the changed actor schema, binary outcome, umpire callbacks, and `failure_resolution`/`umpire_rejections` records, as a draft pending approval. |
 | 1.0.0 | Retained the engine mechanics and defined a transport-neutral multi-turn execution contract. Removed UI, hosting, authentication, deployment, persistence, and provider-selection requirements from the active scope. |
 
 #### Deferred UI / Execution-Bridge Scope
@@ -64,6 +64,7 @@ The engine contract describes values and behavior, not a transport. A caller sub
 The engine-side integration supplies proposal-generation and peer-review implementations through the adapters in Section 3.5.
 The caller may also supply an optional umpire-review callback to apply the human user's decisions before the roll.
 A separate umpire-controlled failure resolver must provide a consequence after every failed roll.
+Because any turn can fail, the proposal generator, peer reviewer, and failure resolver are all required for every run; the engine checks they are present before the first turn.
 These callables are not serialized into `RunRequest`; collecting user input, provider selection, credentials, and transport remain outside this contract.
 Mechanics, validation, turn ordering, state transitions, and result records remain governed by this specification.
 
@@ -570,6 +571,8 @@ The proposal's `active_actor_id` must equal the actor taking the turn; its `post
 ### 3.5 Engine-Side Adapters & Umpire Callbacks
 
 The runner invokes two engine-side adapters, may invoke the optional pre-roll `UmpireReview`, and invokes `FailureResolver` after every failed roll.
+`ProposalGenerator`, `PeerReviewer`, and `FailureResolver` are required for every run, because any turn can fail; `UmpireReview` is optional.
+The engine checks the required callables are present before the first turn; a missing one raises `InvalidRunRequestError` before any adapter call or random draw.
 None is part of the serialized `RunRequest`; how a UI or bridge gathers the human user's decisions is outside this specification:
 
 ```text
@@ -634,7 +637,8 @@ The original returned text is stored in canon and the audit record after those c
 The engine records the validated decision in `failure_resolution` and applies it before the next actor's turn.
 On Success, `FailureResolver` is not invoked and `failure_resolution` is null.
 
-A missing required resolver or decision, a non-lowest/unknown source actor, a non-null source when no peers exist, blank fields, an already-canonical or rejected-proposal statement, malformed output, or callback failure/cancellation raises `UmpireResolutionError` with code `UMPIRE_RESOLUTION_FAILED`.
+A missing decision, a non-lowest/unknown source actor, a non-null source when no peers exist, blank fields, an already-canonical or rejected-proposal statement, malformed output, or callback failure/cancellation raises `UmpireResolutionError` with code `UMPIRE_RESOLUTION_FAILED`.
+A missing `FailureResolver` is never discovered here: it is rejected before the first turn with `InvalidRunRequestError`.
 The engine does not replace an invalid decision with a random argument, generated story, or no-change outcome.
 It does not retry or publish partial state on this error.
 
@@ -675,7 +679,7 @@ Non-blank statements retain their original text.
   Adapters and umpire callbacks do not consume the engine's random stream.
 * **Invariant 11 (State and Result Atomicity):** The submitted `WorldState` is never mutated.
   The engine returns a final state and exactly `turn_count` records only after all requested turns complete.
-  An engine error, including an unavailable or invalid failure resolution, returns no partial state.
+  An engine error, including an invalid failure resolution, returns no partial state.
 * **Invariant 12 (Time and Round Counters):** `turn_index` increments once after each resolved turn. Within a request, `session_index` increments once after every complete pass through that request's order; it does not increment for an incomplete final pass. A new request starts a new order rather than resuming an incomplete pass. There are no round-end tracker resets.
 * **Invariant 13 (Unique Actor Identity):** Actor IDs must be unique and non-empty so that each run order identifies exactly one actor per turn.
 * **Invariant 14 (Seeded Draw Order):** If `first_round_order` is omitted, `rng.shuffle` consumes the run's first random draws.
@@ -686,7 +690,7 @@ Non-blank statements retain their original text.
   Failure resolution happens after the roll and draws no additional randomness.
   Neither tier, table contents, nor umpire decisions changes this draw sequence; JSON object key order must not affect table selection.
   * **Golden Vector (Python 3.11):** With seed `42`, actor IDs `["actor_a", "actor_b"]`, and no supplied order, shuffle produces `["actor_b", "actor_a"]`. The first posture roll is `1` (Obvious), selected tables are `Method` then `Focus`, their d66 rolls are `22` and `61`, and resolution dice are `6` and `6` (base total `12`).
-* **Invariant 15 (Explicit Failure Types):** Invalid requests raise `InvalidRunRequestError`; proposal generation, invalid proposals, peer review, umpire review, umpire failure resolution, and mechanics failures raise their corresponding `RunError` type.
+* **Invariant 15 (Explicit Failure Types):** Invalid requests and missing required callables raise `InvalidRunRequestError` before the first turn; proposal generation, invalid proposals, peer review, umpire review, umpire failure resolution, and mechanics failures raise their corresponding `RunError` type.
   No engine-level retry or partial result is permitted.
   `MechanicsError` signals a violated internal engine invariant, such as a die result, table lookup, or counter outside its defined range.
   It indicates an engine defect, never a legitimate game outcome or invalid caller or adapter input.
@@ -706,10 +710,12 @@ Non-blank statements retain their original text.
 ### Inputs & Triggers
 
 The engine accepts a `RunRequest` as defined in Section 3.4: a complete `WorldState`, positive `turn_count`, and optional `spark_tables`, `first_round_order`, and `seed`. No passcode, transport token, file path, storage location, or deployment trigger is an engine input.
+Alongside the request, the caller supplies the required `ProposalGenerator`, `PeerReviewer`, and `FailureResolver` callables and, optionally, `UmpireReview` (Section 3.5).
 
 ### Turn Execution
 
 1. Validate the complete world state, unique actor IDs, positive `turn_count`, optional order permutation, and any supplied complete `spark_tables` override before executing any turn. A run requires at least one actor. Invalid supplied tables fail validation; they do not trigger a fallback.
+   Confirm that `ProposalGenerator`, `PeerReviewer`, and `FailureResolver` are all supplied; a missing one raises `InvalidRunRequestError` before any adapter call or random draw.
 2. Select the built-in `trio-d66-v1` tables if `spark_tables` is omitted; otherwise use the valid caller-supplied set unchanged. Create one `random.Random` instance from the non-negative `seed`, or system entropy when omitted. Select the first-round order from the supplied permutation, or shuffle the actor IDs with that instance.
 3. Execute exactly `turn_count` turns, advancing through the order and restarting at its first actor after each complete pass:
    a. Roll the posture die and map the result to its TriO tier. Independently sample two distinct tables, roll one d66 entry from each, and construct their spark tags in selection order.
@@ -764,12 +770,16 @@ The successful output is the versioned `RunResult` in Section 3.4. The engine do
 * **Edge Case 13: Unsuitable or Repeated Failure Statement:** The umpire may restate a selected argument or supply a consequence if no candidate is usable.
   Returning a blank statement, an existing normalized canon fact, or the rejected proposal raises `UmpireResolutionError`.
   The engine must not silently complete the turn with no narrative change.
-* **Edge Case 14: Missing or Invalid Failure Decision:** A failed roll without a resolver or valid decision raises `UmpireResolutionError`.
+* **Edge Case 14: Missing or Invalid Failure Decision:** A missing `FailureResolver` is rejected with `InvalidRunRequestError` before the first turn, not discovered at the first failed roll.
+  At a failed roll, a missing or invalid decision raises `UmpireResolutionError`.
   Choosing a non-lowest or unknown peer source, or a non-null source when no peers exist, is invalid.
   Callback failure/cancellation also aborts the run with no partial result.
 * **Edge Case 15: Proposal Already in Canon:** A proposal whose normalized statement matches an existing canon fact would add nothing on Success.
   It is rejected with `InvalidProposalError` before peer review, so no peer calls or resolution dice are spent on it.
   The engine does not request regeneration.
+* **Edge Case 16: Missing Required Callable:** A run without `ProposalGenerator`, `PeerReviewer`, or `FailureResolver` is rejected with `InvalidRunRequestError` before the first turn.
+  This applies even when the run might never need the callable, such as `PeerReviewer` in a one-actor run or `FailureResolver` in a run that would succeed every turn.
+  No adapter is called, no random number is drawn, and the caller's state is untouched.
 
 ---
 
@@ -811,9 +821,11 @@ The successful output is the versioned `RunResult` in Section 3.4. The engine do
   If no candidate is usable or there are no peers, accept an umpire-supplied null-source consequence with a rationale.
 * **New Failure State:** Reject blank consequences, canon duplicates after whitespace/outer-quote normalization, and statements matching the rejected proposal.
   Assert each resolved Failure changes `canon_facts`, not just the time counters.
-* **Failure Resolver Errors:** Reject a missing callback/decision, unknown or non-lowest sources, invalid fields, and callback failure/cancellation with `UmpireResolutionError`.
+* **Failure Resolver Errors:** Reject a missing decision, unknown or non-lowest sources, invalid fields, and callback failure/cancellation with `UmpireResolutionError`.
   A one-actor failure requires a null source.
   No invalid decision may become a no-op, automatic tie-break, generated fallback, or partial run result.
+* **Required Callables:** Assert a run missing `ProposalGenerator`, `PeerReviewer`, or `FailureResolver` raises `InvalidRunRequestError` before the first turn, with no adapter calls and no random draws.
+  Assert an omitted `UmpireReview` is accepted.
 * **Narrative State Preservation:** Assert resolution does not automatically change actor records or create mechanical trackers and boons.
   On Failure, only the validated consequence enters canon; unselected arguments and the rejected proposal do not.
 * **State-Change Records:** Assert each changed top-level field appears once, sorted by ascending JSON Pointer, with before/after values and engine-generated reason text that is identical for identical inputs and umpire decisions.
@@ -825,7 +837,7 @@ The successful output is the versioned `RunResult` in Section 3.4. The engine do
 * Compare identical seeded runs with and without a human vote rejection: dice draws stay the same, but the modifier, outcome, and resulting canon reflect the post-review votes.
 * Verify the next actor's proposal/review inputs include the preceding failed turn's new consequence.
 * Verify a run ending partway through a round still exports its last failure consequence.
-* Include a missing or invalid failure decision after an earlier resolved turn to verify run-wide atomicity.
+* Include an invalid failure decision after an earlier resolved turn to verify run-wide atomicity.
 * Assert the input `WorldState` remains unchanged after both successful and failed runs, and that failures expose no partial result.
 
 ---
