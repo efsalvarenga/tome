@@ -1,5 +1,9 @@
 # Goldfish Review: TOME Core Architecture
 
+> **Editorial note (2026-11-13):** Spec 1.1.1 replaced the setting-specific example text with neutral placeholders (Actor A, Actor B, "Fact 1.", "outcome X").
+> Quotations of that example text in the reports below were updated to the new wording.
+> The findings, line references, and verdicts are otherwise unchanged; the earlier wording remains in Git history.
+
 ## Spec Version 1.1.0 Approval Check (2026-11-11)
 
 **Review Target:** [`docs/designs/001_tome_core_architecture.md`](../designs/001_tome_core_architecture.md) (Spec Version 1.1.0, Interface Contract 1.1.0)
@@ -16,7 +20,7 @@ The spec now says in one place when the flag is set and the anchor replaced: dur
 It also says that both `UmpireReview` and `evaluation_before_reversion` see the evaluation in exactly that form (L150).
 Sections 3.0 (L223), 3.4 (L625) and 3.5 (L733, L739) all say the same thing.
 The §7 test pins it with fixed values (L988).
-The scenario in the review's NEW-09 probe now has only one correct result: `{biased_shift_applied: true, cited_anchor: "The conduit is open."}`.
+The scenario in the review's NEW-09 probe now has only one correct result: `{biased_shift_applied: true, cited_anchor: "Fact 1."}`.
 
 NEW-10 is resolved: §8 now records all three 1.1.0 passes and what each one found.
 
@@ -31,7 +35,7 @@ One wording nitpick remains, and it does not block approval.
 | :--- | :--- | :--- | :--- |
 | PROBE-01 (NEW-09) | Evaluation passed to the umpire and kept as `evaluation_before_reversion` | **Resolved.** L147–148 define the *mechanically validated evaluation*: the engine sets the flag from whether a valid non-zero shift remains and replaces the anchor with the canon text. L150 says `UmpireReview` receives it and `evaluation_before_reversion` stores it "in exactly that form". L151 says reversion happens only after that. | — |
 | PROBE-02 (NEW-09) | Do the other sections agree? | **Consistent.** L223, L625, L733 and L739 all describe the same mechanically validated evaluation. L732 and L737 match L148. | — |
-| PROBE-03 (NEW-09) | Fixed-value test | **Present.** L988 sets up baseline 1, final 0, adapter flag `false` and a padded anchor. It asserts that the callback input and the stored record both have flag `true` and anchor `"The conduit is open."`, and that the final evaluation is `1`/false/null. | — |
+| PROBE-03 (NEW-09) | Fixed-value test | **Present.** L988 sets up baseline 1, final 0, adapter flag `false` and a padded anchor. It asserts that the callback input and the stored record both have flag `true` and anchor `"Fact 1."`, and that the final evaluation is `1`/false/null. | — |
 | PROBE-04 | "Original evaluation" wording | L157 and Edge Case 10 (L933) still said "the original evaluation". L150, L625, L739 and the L988 test already settle the meaning, so this is not a contract ambiguity. | Low |
 | PROBE-05 (NEW-10) | §8 gate text | **Resolved.** §8 records the three passes, names NEW-01, NEW-02 and NEW-09, and correctly leaves this confirmation pending. | — |
 
@@ -115,7 +119,7 @@ One narrow ambiguity remains (NEW-09 below), and a one-sentence edit fixes it.
 | Item | Status | Evidence |
 | :--- | :--- | :--- |
 | NEW-01: actor-ID references | **Resolved** | §3.0 L214–216 says actor IDs are identifiers, normalisation applies only to the uniqueness check, and every reference must match exactly. This is restated for `first_round_order` (§3.4 L358), the peer `voter_actor_id` (L650, §3.5 L726), and umpire and failure-resolver IDs (L216, with L741 and L762 relying on it). Invariant 13 (L819) and Invariant 1 (L780) agree. The §7 tests at L989–990 fix the padded `first_round_order` case, the quoted `voter_actor_id` case, and `"a"`/`" a "` being rejected as a match. |
-| NEW-02: stored `cited_anchor` | **Partly resolved** | L149 and L219–220 now agree that a retained anchor is replaced by the matched canon fact's original text. The L988 test pins `'  "The conduit is open."  '` → `"The conduit is open."`. It is still open what the *pre-reversion* evaluation contains. See NEW-09. |
+| NEW-02: stored `cited_anchor` | **Partly resolved** | L149 and L219–220 now agree that a retained anchor is replaced by the matched canon fact's original text. The L988 test pins `'  "Fact 1."  '` → `"Fact 1."`. It is still open what the *pre-reversion* evaluation contains. See NEW-09. |
 
 #### 2.2 Non-Blocking Items NEW-03 to NEW-08
 
@@ -133,7 +137,7 @@ One narrow ambiguity remains (NEW-09 below), and a one-sentence edit fixes it.
 
 | ID | Area / Component | Potential Failure Mode / Ambiguity | Risk Severity |
 | :--- | :--- | :--- | :--- |
-| NEW-09 | Contents of the pre-reversion evaluation | Take a peer that returns baseline 1, final 0, `biased_shift_applied: false` and anchor `'  "The conduit is open."  '`, and an umpire who then rejects the shift. Implementation A normalises during mechanical validation, reading L730 and L622 ("mechanically validated evaluation"). Its `evaluation_before_reversion` and the `UmpireReview` input carry `{flag: true, cited_anchor: "The conduit is open."}`. Implementation B substitutes only for "remaining"/"retained" votes and sets the flag "after … any umpire review", reading L147, L149, L219–220, and L984 ("original anchors"). It carries `{flag: false, cited_anchor: '  "The conduit is open."  '}`. Both readings are defensible, and they produce different `TurnRecord.umpire_rejections` output. | Med |
+| NEW-09 | Contents of the pre-reversion evaluation | Take a peer that returns baseline 1, final 0, `biased_shift_applied: false` and anchor `'  "Fact 1."  '`, and an umpire who then rejects the shift. Implementation A normalises during mechanical validation, reading L730 and L622 ("mechanically validated evaluation"). Its `evaluation_before_reversion` and the `UmpireReview` input carry `{flag: true, cited_anchor: "Fact 1."}`. Implementation B substitutes only for "remaining"/"retained" votes and sets the flag "after … any umpire review", reading L147, L149, L219–220, and L984 ("original anchors"). It carries `{flag: false, cited_anchor: '  "Fact 1."  '}`. Both readings are defensible, and they produce different `TurnRecord.umpire_rejections` output. | Med |
 | NEW-10 | §8 gate text is out of date | L1037–1040 still describes only the first 1.1.0 review. It does not record that the confirmation pass returned NEW-01 and NEW-02. | Low |
 
 ---
@@ -231,7 +235,7 @@ I re-checked the mechanics on **Python 3.11.18**, the version the golden vectors
   - **Draws:** Seed `20` with the supplied order gives posture roll 6 (Odd), tables `Focus` then `Method`, d66 rolls 66 and 13, and dice 5 + 2 = 7.
     Those rolls map to `Focus:Resource access` and `Method:Public declaration`, as the example shows.
   - **Resolution:** The net modifier is −1, so the adjusted total is 6, which is a Failure.
-    The only candidate is `actor_dock_syndicate`, which matches the resolution's source.
+    The only candidate is `actor_b`, which matches the resolution's source.
   - **Records:** The state changes use the codes `failure-consequence` (L601) and `turn-tick` (L607), in ascending pointer order.
     `session_index` stays 0, and the TurnRecord has exactly the 12 declared fields.
 * **Normalisation vectors (L1006):** I worked each one through the rule at L205–211, and all of them follow from it.
@@ -263,7 +267,7 @@ Each needs about one sentence to fix.
 | PROBE-09 Pruned proposal audit | Addressed | L718: reviewers, the record and the callbacks all receive the pruned proposal, and pruned pros are not kept. |
 | PROBE-10 `session_index` comment | Addressed | L388: "world session_index after this turn". |
 | PROBE-11 `contract_version` mismatch | Addressed | Covered by Edge Case 5 (L910), §5 step 1 (L858) and the L1008 test. |
-| PROBE-12 Example rationale | Addressed | The L591 rationale now says "restates its blocking argument as a concrete event". |
+| PROBE-12 Example rationale | Addressed | The L591 rationale now says "restates its argument as a concrete event". |
 | PROBE-13 Goal wording, and whitespace-only `id` | Addressed | L46–47 now limits grounding to pros and anchors. `id` uses `pattern: "\\S"` (L248), and L269 adds the full rule. |
 | PROBE-14 Rules that cannot be enforced | Addressed | L124 says the rule is "narrative guidance … the engine does not enforce it". |
 | Return the effective seed (2025 suggestion) | Still open (non-blocking) | `RunResult` (L368–373) has no seed. |
@@ -274,8 +278,8 @@ Each needs about one sentence to fix.
 
 | ID | Area / Component | Potential Failure Mode / Ambiguity | Risk Severity |
 | :--- | :--- | :--- | :--- |
-| NEW-01 | Normalisation scope: actor-ID references | L213 says "Every comparison … normalizes both sides" and then lists only anchors, `source_ref`, novelty and canon duplicates. Actor-ID uniqueness uses "match" (L267, L645), so it is normalised. The other places that refer to actor IDs do not say which rule they use: `first_round_order` "contain every actor ID exactly once" (L353, Invariant 1 L774), `voter_actor_id` "must equal" (L644, L720), `UmpireRejection.voter_actor_id` (L728) and `source_voter_actor_id` (L745). For example, `first_round_order: ["actor_iron_choir ", …]` or `voter_actor_id: "\"actor_dock_syndicate\""` could raise `InvalidRunRequestError` or `PeerReviewError` in one implementation and be accepted in another. Nothing says which ID text the record would then use. | Med |
-| NEW-02 | Stored `cited_anchor` text | L149 says "Remaining shifted votes retain the **normalized** anchor". L216 says "The engine stores and returns the **original** text, not its normalized form". The test at L981 ("normalized shift flags/anchors") does not settle it. `cited_anchor` appears in `TurnRecord.peer_evaluations` and in `UmpireRejectionRecord.evaluation_before_reversion`, so this contradiction is visible in the contract output. Take an adapter anchor `'  "The conduit is open."  '`. It could be stored as the adapter's original text, as its normalised form, or as the text of the matching canon fact. | Med |
+| NEW-01 | Normalisation scope: actor-ID references | L213 says "Every comparison … normalizes both sides" and then lists only anchors, `source_ref`, novelty and canon duplicates. Actor-ID uniqueness uses "match" (L267, L645), so it is normalised. The other places that refer to actor IDs do not say which rule they use: `first_round_order` "contain every actor ID exactly once" (L353, Invariant 1 L774), `voter_actor_id` "must equal" (L644, L720), `UmpireRejection.voter_actor_id` (L728) and `source_voter_actor_id` (L745). For example, `first_round_order: ["actor_a ", …]` or `voter_actor_id: "\"actor_b\""` could raise `InvalidRunRequestError` or `PeerReviewError` in one implementation and be accepted in another. Nothing says which ID text the record would then use. | Med |
+| NEW-02 | Stored `cited_anchor` text | L149 says "Remaining shifted votes retain the **normalized** anchor". L216 says "The engine stores and returns the **original** text, not its normalized form". The test at L981 ("normalized shift flags/anchors") does not settle it. `cited_anchor` appears in `TurnRecord.peer_evaluations` and in `UmpireRejectionRecord.evaluation_before_reversion`, so this contradiction is visible in the contract output. Take an adapter anchor `'  "Fact 1."  '`. It could be stored as the adapter's original text, as its normalised form, or as the text of the matching canon fact. | Med |
 | NEW-03 | Out-of-range adapter integers | A peer result such as `final_vote: 2` (with baseline 1, a one-step delta) breaks the declared type `integer in [-1, 1]` (L333). Edge Case 17 (L947) and L713/L720 list "wrong type" but not "out of range", while Invariant 3 (L780–782) speaks only of reverting two-step shifts. One reading gives `PeerReviewError`; another clamps or reverts. | Low |
 | NEW-04 | `ReasonCode` joining rule cannot be tested | In 1.1.0 each field gets exactly one code per turn (L631–634). The `"; "` joining rule (L405, L636) therefore never applies, so the matching part of the L1011 test cannot be exercised. | Low |
 | NEW-05 | Leftover "engine-side" wording | L50 ("may be supplied by engine-side adapters"), L866 ("engine-side proposal-generation integration") and L912 still use the wording that RR-6 asked to reconcile with L72 and L662 ("caller owns all four callables"). | Low |
@@ -381,7 +385,7 @@ I checked the worked examples against the rules, and they hold up:
 * **Worked example (§3.4):** Seed `20` gives a posture roll of 6 (Odd), tables `Focus` then `Method`, d66 rolls 66 and 13, and resolution dice 5 + 2 = 7.
   The override tables map these to `Focus:Resource access` and `Method:Public declaration`, which matches the example.
 * **Example arithmetic:** One unshifted vote of −1 gives a net modifier of −1, so 7 − 1 = 6, which is a Failure.
-  The candidate set `{actor_dock_syndicate}` matches the resolution source.
+  The candidate set `{actor_b}` matches the resolution source.
   The `state_changes` entries are in ascending pointer order (`/canon_facts` before `/turn_index`).
   `session_index` correctly stays 0 for an incomplete pass, and `turn_index` goes from 0 to 1.
 
@@ -417,7 +421,7 @@ Each of these is cheap to fix, but each affects determinism or whether the spec 
 | PROBE-09 | Pruning audit | The record keeps only grounded pros (L589, L270). Pruned pros disappear from the audit. It is not stated whether `PeerReviewer` (L633) receives the pruned or the unpruned proposal. | Low |
 | PROBE-10 | Counter semantics | The TurnRecord comment says `session_index` is the "completed-round count after this turn" (L362). It is really the cumulative world counter, which may start above 0. | Low |
 | PROBE-11 | Request validation | A `contract_version` mismatch is implied invalid (literal type, L334) but is missing from Edge Case 5 (L847) and from the §7 tests. | Low |
-| PROBE-12 | Example narrative | The rationale says the umpire "confirms its blocking argument" (L565), but the stored statement restates the argument ("could block" becomes "blocks"). | Low |
+| PROBE-12 | Example narrative | The rationale says the umpire "confirms its argument" (L565), but the stored statement restates the argument ("could prevent" becomes "prevents"). | Low |
 | PROBE-13 | Goal wording | L46 says generators "cannot introduce ungrounded setting details". World-change statements and umpire consequences add new details by design; only pros and anchors are grounded. | Low |
 | PROBE-14 | Untestable rules | "Single declarative assertion … benefiting the active actor" (L123) cannot be checked mechanically, and the spec does not say it is advisory. | Low |
 
@@ -481,7 +485,7 @@ Each of these is cheap to fix, but each affects determinism or whether the spec 
   * an adapter returning a boolean where an integer is expected.
 * **[suggestion] (non-blocking) PROBE-14:** Mark "single declarative assertion … benefiting the active actor" (L123) as narrative guidance that the engine does not enforce.
   Similarly, narrow the goal at L46 to say that pros and anchors are the grounded parts.
-* **[nitpick] (non-blocking) PROBE-12, L565:** Align the rationale with the restated statement, for example "the umpire restates its blocking argument as a concrete event".
+* **[nitpick] (non-blocking) PROBE-12, L565:** Align the rationale with the restated statement, for example "the umpire restates its argument as a concrete event".
 
 ---
 

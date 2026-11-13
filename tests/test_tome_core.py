@@ -293,21 +293,21 @@ def test_full_simulation_cycle_e2e():
     from tome.runner import run_simulation_cycle
 
     f1 = Faction(
-        id="fac_iron",
-        name="Iron Choir",
-        agenda="Power",
+        id="actor_a",
+        name="Actor A",
+        agenda="Agenda A",
         posture=Posture.CORNERED,
-        traits=["Scrap Mastery"],
+        traits=["Trait A"],
     )
     f2 = Faction(
-        id="fac_dock",
-        name="Dock Syndicate",
-        agenda="Trade",
+        id="actor_b",
+        name="Actor B",
+        agenda="Agenda B",
         posture=Posture.STABLE,
-        traits=["Harbor Control"],
+        traits=["Trait B"],
     )
     state = WorldState(
-        session_index=1, canon_facts=["The Conduit is open."], active_rumors=[], factions=[f1, f2]
+        session_index=1, canon_facts=["Fact 1."], active_rumors=[], factions=[f1, f2]
     )
 
     def mock_proposal(fac, tier, tags, s):
@@ -317,11 +317,9 @@ def test_full_simulation_cycle_e2e():
             posture_roll=1,
             trio_tier=tier.value,
             spark_tags=tags,
-            world_change_statement=f"{fac.name} claims the conduit.",
+            world_change_statement=f"{fac.name} achieves outcome X.",
             supporting_pros=[
-                SupportingPro(
-                    source_type="canon_fact", source_ref="The Conduit is open.", argument="Open."
-                )
+                SupportingPro(source_type="canon_fact", source_ref="Fact 1.", argument="Open.")
             ],
         )
 
@@ -331,7 +329,7 @@ def test_full_simulation_cycle_e2e():
             baseline_plausibility=1,
             goal_alignment="hostile",
             biased_shift_applied=True,
-            cited_anchor="The Conduit is open.",
+            cited_anchor="Fact 1.",
             final_vote=0,
             public_argument=f"{voter.name} opposes this.",
         )

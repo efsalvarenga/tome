@@ -4,16 +4,23 @@ This document specifies repository calibration, architectural invariants, and ag
 
 ## 1. Project Overview & Architectural Boundaries
 
-* **Repository Identity:** `tome` is a standalone, serverless simulation engine for multi-agent complex systems where fundamental behavioral laws are incomplete or uncertain, providing a formal computational testbed for human umpires and analysts to explore plausible realisations of multi-actor interactions.
-* **Parent Concept:** Integrates **Chris Engle Matrix Games** (structured epistemic argumentation and probability resolution under uncertainty) with **Cezar Capacle's Triple-O framework** (structural posture step-dice and dual spark tables for non-mode-collapsing divergence).
-* **GitOps State Flow:** Pure state transformer:
-  $$\mathcal{M}(\text{WorldState}_{t}, \text{Interventions}) \longrightarrow \text{WorldState}_{t+1} + \text{SimulationDossier}$$
+* **Repository Identity:** `tome` is a standalone, turn-based simulation engine for multi-actor systems whose behavioural rules are incomplete or uncertain.
+  It lets a human umpire explore plausible outcomes of interactions between actors.
+* **Scenario-Agnostic Engine:** The engine describes no particular setting, cast of actors, or application domain.
+  Callers supply the actors, canon facts, and generators.
+  Examples and test fixtures use neutral placeholders (Actor A, Actor B, "Fact 1.", "outcome X").
+* **Parent Concept:** Integrates **Chris Engle Matrix Games** (structured argumentation and probability resolution under uncertainty) with **Cezar Capacle's Triple-O framework** (the Obvious / Option / Odd tier and d66 spark tables for divergent narrative cues).
+* **Authoritative Design:** [`docs/designs/001_tome_core_architecture.md`](docs/designs/001_tome_core_architecture.md) defines the mechanics and the interface contract.
+  Where this file and the specification differ, the specification wins.
+* **State Flow:** The engine is a library with one entry point, `run(request, proposal_generator, peer_reviewer, failure_resolver, umpire_review=None)`:
+  $$\mathcal{M}(\text{WorldState}_{t}, \text{RunRequest}) \longrightarrow (\text{WorldState}_{t+n}, \text{TurnRecord}_{1..n})$$
 * **Core Philosophy:**
-  1. *Zero Recurring Infrastructure Cost:* Runs on GitHub Actions and GitHub Pages.
-  2. *Deterministic Mechanical Core:* Pure Python handles dice rolls, spark tables, posture shifts, and validation gates without network or LLM dependencies.
-  3. *Strict Epistemic Grounding:* The Grounding / Linter Gate strictly prevents LLM hallucinations from introducing ungrounded facts or invalid voter shifts.
-  4. *Air-Gapped Access Control:* Workflow passcode fail-gate, Personal Access Token (PAT) client storage, and concurrency locks prevent unauthorized spend.
-  5. *Umpire Trajectory Exploration:* Empowers the human simulation umpire to inspect emergent complications, institutional friction, and counter-realities across stochastic runs.
+  1. *Deterministic Mechanical Core:* Pure Python handles the posture die, spark-table draws, vote validation, and 2d6 resolution without network or LLM dependencies; a supplied seed reproduces every engine-controlled draw.
+  2. *Strict Epistemic Grounding:* Supporting arguments and vote shifts must cite existing canon facts; the human umpire may additionally reject illogical vote shifts.
+  3. *Narrative-Only State:* There are no mechanical trackers; actor conditions exist only as canon facts, and every resolved turn adds exactly one new fact.
+  4. *Transport-Neutral Boundary:* The caller owns transport, authorisation, persistence, presentation, and the choice of LLM provider.
+  5. *Umpire Trajectory Exploration:* Empowers the human simulation umpire to inspect emergent complications, friction between actors, and alternative outcomes across stochastic runs.
+* **Out of Scope:** A UI, hosting, deployment, and execution bridge belong in a separate repository; see the deferred scope in the specification's changelog.
 
 ## 2. Specification & Governance Protocols
 
@@ -22,6 +29,7 @@ This document specifies repository calibration, architectural invariants, and ag
   * Zero-context adversarial critiques live in `docs/reviews/<NNN>_<feature_slug>_review.md`.
   * Specifications must pass `validate_egm.py` before core production implementation commences.
 * **Strict No-Code Rule during Elephant Drafting:** Design specifications focus on contracts, state schemas, invariants, and edge cases before code is written.
+* **One Sentence per Line:** In Markdown prose, write each sentence on its own source line for cleaner diffs; code blocks, tables, and headings are exempt.
 
 ## 3. Technology Stack & Standards
 
@@ -31,8 +39,7 @@ This document specifies repository calibration, architectural invariants, and ag
   * `pydantic` (v2) for strict runtime schema validation and serialization.
   * `pytest` for deterministic mechanical test suites.
   * `ruff` for linting and formatting.
-* **Frontier LLM Integration:** Google Gemini (`google-genai`) with structured JSON schema output enforcement.
-* **Client / UI:** Minimalist static PWA (`pwa/`) hosted on GitHub Pages communicating via GitHub REST API.
+* **LLM Integration:** Provider-agnostic; LLM calls live in the caller-supplied `proposal_generator` and `peer_reviewer`, never in the engine core.
 
 ## 4. Branching & Pull Request Protocols
 

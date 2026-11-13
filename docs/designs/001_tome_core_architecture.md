@@ -4,7 +4,7 @@
 
 | Metadata | Value |
 | :--- | :--- |
-| Spec Version | 1.1.0 |
+| Spec Version | 1.1.1 |
 | Interface Contract Version | 1.1.0 |
 | Status | Approved |
 | Author | Elephant Agent & Developer |
@@ -14,6 +14,7 @@
 
 | Spec Version | Summary |
 | :--- | :--- |
+| 1.1.1 | Editorial, 2026-11-13: replaced setting-specific example text with neutral placeholders (Actor A, Actor B, "Fact 1.", "outcome X") so the specification describes no particular scenario. No change to the interface contract, mechanics, rules, or tests; the Goldfish approval of 1.1.0 applies unchanged. |
 | 1.1.0 | Approved 2026-11-11 after Goldfish review: standardized TriO and actor terminology; replaced persistent posture and step-dice with a per-turn d6; provided default spark tables with complete caller overrides and tier-independent random selection; simplified resolution to 2d6 plus peer votes against 7+; deferred actor traits and retained canon-only grounding; removed mechanical trackers, exhaustion, boons, and outcome bands; added optional pre-roll umpire rejection of illogical shifts and mandatory umpire resolution of failures into new canon consequences based on the lowest final peer votes; required proposals to be new to canon so every resolved turn, Success or Failure, adds exactly one new fact; removed the descriptive `goal_alignment` field from peer evaluations; defined the `Actor` and `TrioTier` types, distinguished the posture die from its TriO tier, and removed the constant `posture_die` field; removed the unused `active_rumors` world-state field; clarified engine-generated state-change reasons and when `MechanicsError` applies; required the proposal generator, peer reviewer, and failure resolver to be checked before the first turn; after Goldfish review, defined a single text-normalization rule and strict value rules (Section 3.0), required non-blank and non-matching canon facts, fixed one error per adapter-output defect, defined a `ReasonCode` vocabulary for `StateChange.reason`, pinned the seeded shuffle input to `WorldState.actors` order with a second golden vector, and defined the caller-owned `run` entry point; after Goldfish confirmation, compared actor-ID references exactly, stored retained anchors as the matched canon fact's text, fixed that substitution at mechanical validation so the umpire and `evaluation_before_reversion` see the same form, and treated out-of-range integers as malformed; bumped the interface contract to 1.1.0 for the changed actor schema, binary outcome, umpire callbacks, and `failure_resolution`/`umpire_rejections` records, as a draft pending approval. |
 | 1.0.0 | Retained the engine mechanics and defined a transport-neutral multi-turn execution contract. Removed UI, hosting, authentication, deployment, persistence, and provider-selection requirements from the active scope. |
 
@@ -30,7 +31,7 @@ They are intentionally not requirements of this engine contract; the previous do
 The **TriO Matrix Engine (TOME)** is a turn-based simulation engine for exploring emergent realisations in complex multi-agent systems where fundamental behavioral dynamics are incomplete, uncertain, or emergent.
 It synthesizes the structured argumentation and mechanical probability resolution of **Chris Engle Matrix Games** with the behavioral divergence mechanics of **Cezar Capacle's Triple-O framework**.
 
-**TOME** models multi-actor interactions, institutional friction, and strategic adaptations without relying on conversational consensus, fixed utility equations, or ungrounded claims.
+**TOME** models multi-actor interactions, friction between actors, and adaptation without relying on conversational consensus, fixed utility equations, or ungrounded claims.
 The engine accepts a complete world state and a bounded run request, then returns the final state and an auditable per-turn rationale:
 
 $$\mathcal{M}(\text{WorldState}_{t}, \text{RunRequest}) \longrightarrow (\text{WorldState}_{t+n}, \text{TurnRecord}_{1..n})$$
@@ -188,7 +189,7 @@ Peer arguments retain ordinary pro/con wording; no separate failure-statement fi
 The umpire may restate an unsuitable argument or supply a consequence when none of the lowest-scored arguments is usable.
 If there are no peers, the umpire supplies the consequence.
 
-The result must describe a concrete new event or condition explaining the failed proposal, such as "The buyer fails to pay because it went bankrupt."
+The result must describe a concrete new event or condition explaining the failed proposal, such as "Actor B prevents outcome X."
 It is a new canonical outcome, not merely an audit note or a repeated fact.
 The engine checks that the statement is a non-whitespace string and matches no canon fact (Section 3.0).
 It must not match the rejected proposal's world-change statement either.
@@ -307,16 +308,16 @@ The proposal's statement must not match any canon fact; that semantic check is d
 
 ```json
 {
-  "active_actor_id": "actor_iron_choir",
+  "active_actor_id": "actor_a",
   "posture_roll": 6,
   "trio_tier": "Odd",
   "spark_tags": ["Focus:Resource access", "Method:Public declaration"],
-  "world_change_statement": "The Iron Choir claims the conduit.",
+  "world_change_statement": "Actor A achieves outcome X.",
   "supporting_pros": [
     {
       "source_type": "canon_fact",
-      "source_ref": "The conduit is open.",
-      "argument": "The open conduit gives the Iron Choir access."
+      "source_ref": "Fact 1.",
+      "argument": "Fact 1 makes outcome X possible for Actor A."
     }
   ]
 }
@@ -345,12 +346,12 @@ The human umpire decides whether it can be used directly, must be restated, or i
 
 ```json
 {
-  "voter_actor_id": "actor_dock_syndicate",
+  "voter_actor_id": "actor_b",
   "baseline_plausibility": 1,
   "biased_shift_applied": true,
-  "cited_anchor": "The conduit is open.",
+  "cited_anchor": "Fact 1.",
   "final_vote": 0,
-  "public_argument": "The conduit is open, but that does not establish exclusive control."
+  "public_argument": "Fact 1 holds, but it does not guarantee outcome X."
 }
 ```
 
@@ -467,17 +468,17 @@ To use defaults instead, omit the entire `spark_tables` field.
   "world_state": {
     "session_index": 0,
     "turn_index": 0,
-    "canon_facts": ["The conduit is open."],
+    "canon_facts": ["Fact 1."],
     "actors": [
       {
-        "id": "actor_iron_choir",
-        "name": "Iron Choir",
-        "agenda": "Control the conduit"
+        "id": "actor_a",
+        "name": "Actor A",
+        "agenda": "Agenda A"
       },
       {
-        "id": "actor_dock_syndicate",
-        "name": "Dock Syndicate",
-        "agenda": "Protect trade"
+        "id": "actor_b",
+        "name": "Actor B",
+        "agenda": "Agenda B"
       }
     ]
   },
@@ -524,7 +525,7 @@ To use defaults instead, omit the entire `spark_tables` field.
       "61": "Motivation 61", "62": "Motivation 62", "63": "Motivation 63", "64": "Motivation 64", "65": "Motivation 65", "66": "Motivation 66"
     }
   },
-  "first_round_order": ["actor_iron_choir", "actor_dock_syndicate"],
+  "first_round_order": ["actor_a", "actor_b"],
   "seed": 20
 }
 ```
@@ -534,7 +535,7 @@ Missing tables, extra table names, and incomplete tables are invalid.
 `spark_table_source` in the result is `request` for a valid override, or `trio-d66-v1` when the request omits overrides.
 
 A completed run returns the complete final world state and exactly one ordered record for each completed turn, including turns whose proposal failed.
-In this example, the base roll of 7 receives a -1 peer modifier, so the proposal fails at 6 and the umpire resolves the peer's blocking argument into a new consequence:
+In this example, the base roll of 7 receives a -1 peer modifier, so the proposal fails at 6 and the umpire resolves the peer's argument into a new consequence:
 
 ```json
 {
@@ -544,19 +545,19 @@ In this example, the base roll of 7 receives a -1 peer modifier, so the proposal
     "session_index": 0,
     "turn_index": 1,
     "canon_facts": [
-      "The conduit is open.",
-      "The Dock Syndicate blocks the approach, preventing the Iron Choir from claiming the conduit."
+      "Fact 1.",
+      "Actor B prevents outcome X."
     ],
     "actors": [
       {
-        "id": "actor_iron_choir",
-        "name": "Iron Choir",
-        "agenda": "Control the conduit"
+        "id": "actor_a",
+        "name": "Actor A",
+        "agenda": "Agenda A"
       },
       {
-        "id": "actor_dock_syndicate",
-        "name": "Dock Syndicate",
-        "agenda": "Protect trade"
+        "id": "actor_b",
+        "name": "Actor B",
+        "agenda": "Agenda B"
       }
     ]
   },
@@ -564,29 +565,29 @@ In this example, the base roll of 7 receives a -1 peer modifier, so the proposal
     {
       "turn_index": 1,
       "session_index": 0,
-      "active_actor_id": "actor_iron_choir",
+      "active_actor_id": "actor_a",
       "proposal": {
-        "active_actor_id": "actor_iron_choir",
+        "active_actor_id": "actor_a",
         "posture_roll": 6,
         "trio_tier": "Odd",
         "spark_tags": ["Focus:Resource access", "Method:Public declaration"],
-        "world_change_statement": "The Iron Choir claims the conduit.",
+        "world_change_statement": "Actor A achieves outcome X.",
         "supporting_pros": [
           {
             "source_type": "canon_fact",
-            "source_ref": "The conduit is open.",
-            "argument": "The open conduit gives the Iron Choir access."
+            "source_ref": "Fact 1.",
+            "argument": "Fact 1 makes outcome X possible for Actor A."
           }
         ]
       },
       "peer_evaluations": [
         {
-          "voter_actor_id": "actor_dock_syndicate",
+          "voter_actor_id": "actor_b",
           "baseline_plausibility": -1,
           "biased_shift_applied": false,
           "cited_anchor": null,
           "final_vote": -1,
-          "public_argument": "The Dock Syndicate could block the approach to prevent this claim."
+          "public_argument": "Actor B could prevent outcome X."
         }
       ],
       "umpire_rejections": [],
@@ -595,17 +596,17 @@ In this example, the base roll of 7 receives a -1 peer modifier, so the proposal
       "adjusted_total": 6,
       "outcome": "Failure",
       "failure_resolution": {
-        "source_voter_actor_id": "actor_dock_syndicate",
-        "world_change_statement": "The Dock Syndicate blocks the approach, preventing the Iron Choir from claiming the conduit.",
-        "rationale": "The only peer has the lowest final vote; the umpire restates its blocking argument as a concrete event."
+        "source_voter_actor_id": "actor_b",
+        "world_change_statement": "Actor B prevents outcome X.",
+        "rationale": "The only peer has the lowest final vote; the umpire restates its argument as a concrete event."
       },
       "state_changes": [
         {
           "path": "/canon_facts",
-          "before": ["The conduit is open."],
+          "before": ["Fact 1."],
           "after": [
-            "The conduit is open.",
-            "The Dock Syndicate blocks the approach, preventing the Iron Choir from claiming the conduit."
+            "Fact 1.",
+            "Actor B prevents outcome X."
           ],
           "reason": "failure-consequence"
         },
@@ -985,12 +986,12 @@ A caller may persist the returned state and turn records as it chooses.
   The separate failure-resolution requirement still applies after a failed roll.
   Callback decisions consume no RNG draws.
 * **Umpire Audit and Errors:** Assert mechanically validated evaluations and user reasons are retained independently in peer order for each rejected shift.
-  For a peer returning baseline `1`, final `0`, `biased_shift_applied: false`, and anchor `'  "The conduit is open."  '` that the umpire rejects, assert `UmpireReview` receives and `evaluation_before_reversion` stores `biased_shift_applied: true` and `cited_anchor: "The conduit is open."`, while the final evaluation has `final_vote: 1`, flag false, and anchor null.
+  For a peer returning baseline `1`, final `0`, `biased_shift_applied: false`, and anchor `'  "Fact 1."  '` that the umpire rejects, assert `UmpireReview` receives and `evaluation_before_reversion` stores `biased_shift_applied: true` and `cited_anchor: "Fact 1."`, while the final evaluation has `final_vote: 1`, flag false, and anchor null.
   Reject duplicate/unknown voters, votes already at baseline, blank reasons, malformed returns, and callback failures/cancellation with `UmpireReviewError`; preserve the submitted state and return no partial result.
 * **Proposal and Evaluation Schemas:** Assert adapter output validation, engine attachment of turn mechanics to `ProposalDraft`, and one ordered peer evaluation per non-active actor.
 * **Voting Metadata:** Assert normalized shift flags follow the numeric shift, grounding checks, and any umpire rejections, including inconsistent adapter flags.
-  Assert a retained shift with anchor `'  "The conduit is open."  '` stores `cited_anchor: "The conduit is open."`, the matched canon fact's original text.
-* **Exact Actor-ID References:** Assert `first_round_order` containing `"actor_iron_choir "` raises `InvalidRunRequestError`, and a peer evaluation with `voter_actor_id: "\"actor_dock_syndicate\""` raises `PeerReviewError`.
+  Assert a retained shift with anchor `'  "Fact 1."  '` stores `cited_anchor: "Fact 1."`, the matched canon fact's original text.
+* **Exact Actor-ID References:** Assert `first_round_order` containing `"actor_a "` raises `InvalidRunRequestError`, and a peer evaluation with `voter_actor_id: "\"actor_b\""` raises `PeerReviewError`.
   Assert actor IDs `"a"` and `" a "` together are rejected as matching.
   Reject a peer evaluation containing the removed `goal_alignment` field as an undeclared field.
 * **Closed State Schema:** Assert unknown fields are rejected at both world-state and actor-object levels.
