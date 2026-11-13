@@ -6,7 +6,7 @@
 | :--- | :--- |
 | Spec Version | 1.1.0 |
 | Interface Contract Version | 1.1.0 |
-| Status | Under Review |
+| Status | Approved |
 | Author | Elephant Agent & Developer |
 | Target Milestone | v0.1.0 (Core Engine & Pure-Python Mechanics) |
 
@@ -14,7 +14,7 @@
 
 | Spec Version | Summary |
 | :--- | :--- |
-| 1.1.0 | Revision under human review: standardized TriO and actor terminology; replaced persistent posture and step-dice with a per-turn d6; provided default spark tables with complete caller overrides and tier-independent random selection; simplified resolution to 2d6 plus peer votes against 7+; deferred actor traits and retained canon-only grounding; removed mechanical trackers, exhaustion, boons, and outcome bands; added optional pre-roll umpire rejection of illogical shifts and mandatory umpire resolution of failures into new canon consequences based on the lowest final peer votes; required proposals to be new to canon so every resolved turn, Success or Failure, adds exactly one new fact; removed the descriptive `goal_alignment` field from peer evaluations; defined the `Actor` and `TrioTier` types, distinguished the posture die from its TriO tier, and removed the constant `posture_die` field; removed the unused `active_rumors` world-state field; clarified engine-generated state-change reasons and when `MechanicsError` applies; required the proposal generator, peer reviewer, and failure resolver to be checked before the first turn; bumped the interface contract to 1.1.0 for the changed actor schema, binary outcome, umpire callbacks, and `failure_resolution`/`umpire_rejections` records, as a draft pending approval. |
+| 1.1.0 | Approved 2026-11-11 after Goldfish review: standardized TriO and actor terminology; replaced persistent posture and step-dice with a per-turn d6; provided default spark tables with complete caller overrides and tier-independent random selection; simplified resolution to 2d6 plus peer votes against 7+; deferred actor traits and retained canon-only grounding; removed mechanical trackers, exhaustion, boons, and outcome bands; added optional pre-roll umpire rejection of illogical shifts and mandatory umpire resolution of failures into new canon consequences based on the lowest final peer votes; required proposals to be new to canon so every resolved turn, Success or Failure, adds exactly one new fact; removed the descriptive `goal_alignment` field from peer evaluations; defined the `Actor` and `TrioTier` types, distinguished the posture die from its TriO tier, and removed the constant `posture_die` field; removed the unused `active_rumors` world-state field; clarified engine-generated state-change reasons and when `MechanicsError` applies; required the proposal generator, peer reviewer, and failure resolver to be checked before the first turn; after Goldfish review, defined a single text-normalization rule and strict value rules (Section 3.0), required non-blank and non-matching canon facts, fixed one error per adapter-output defect, defined a `ReasonCode` vocabulary for `StateChange.reason`, pinned the seeded shuffle input to `WorldState.actors` order with a second golden vector, and defined the caller-owned `run` entry point; after Goldfish confirmation, compared actor-ID references exactly, stored retained anchors as the matched canon fact's text, fixed that substitution at mechanical validation so the umpire and `evaluation_before_reversion` see the same form, and treated out-of-range integers as malformed; bumped the interface contract to 1.1.0 for the changed actor schema, binary outcome, umpire callbacks, and `failure_resolution`/`umpire_rejections` records, as a draft pending approval. |
 | 1.0.0 | Retained the engine mechanics and defined a transport-neutral multi-turn execution contract. Removed UI, hosting, authentication, deployment, persistence, and provider-selection requirements from the active scope. |
 
 #### Deferred UI / Execution-Bridge Scope
@@ -43,11 +43,11 @@ $$\mathcal{M}(\text{WorldState}_{t}, \text{RunRequest}) \longrightarrow (\text{W
 * **Narrative-Only Trackers:** Actor conditions and capabilities are narrative facts, not mechanical meters.
   There are no persistent posture levels, consumable capability pools, recovery mechanics, or automatic bonuses from trackers.
   Turn and round counters record simulation time only.
-* **Strict Epistemic Grounding (The Linter Gate):** Proposal generators and peer reviewers cannot introduce ungrounded setting details or arbitrary voting shifts.
-  Citation checks enforce whitespace-stripped exact matching against existing `canon_facts` only; they do not prove that the argument is logical.
+* **Strict Epistemic Grounding (The Linter Gate):** Supporting arguments and shifted votes must be grounded in existing `canon_facts`; proposal statements and failure consequences add new facts by design.
+  Citation checks use the normalized matching defined in Section 3.0; they do not prove that the argument is logical.
   The human umpire may reject illogical vote shifts through an optional pre-resolution review callback.
 * **Transport-Neutral Execution Contract:** Define versioned input, output, turn-order, validation, and failure semantics without prescribing a UI, transport, hosting provider, or persistence mechanism.
-* **Isolated Provider Boundary:** Proposal generation and peer review may be supplied by engine-side adapters; this specification does not select an LLM provider or expose provider credentials through the contract.
+* **Isolated Provider Boundary:** Proposal generation and peer review are supplied by caller-owned callables; this specification does not select an LLM provider or expose provider credentials through the contract.
 * **Narrative Progression Every Turn:** Every resolved turn adds exactly one new fact to canon.
   Success adds the proposal, which must be new to canon.
   Failure adds a new, umpire-resolved consequence instead of merely rejecting the proposal.
@@ -72,7 +72,7 @@ A caller submits a complete `WorldState` and a run request, and receives a compl
 The caller is responsible for transport, authorization, persistence, and presenting results.
 A UI or execution bridge may use synchronous calls, asynchronous jobs, or another mechanism without changing this contract.
 
-The engine-side integration supplies proposal-generation and peer-review implementations through the adapters in Section 3.5.
+The caller supplies the proposal generator and peer reviewer, which typically wrap an LLM provider, through the run entry point in Section 3.5.
 The caller may also supply an optional umpire-review callback to apply the human user's decisions before the roll.
 A separate umpire-controlled failure resolver must provide a consequence after every failed roll.
 Because any turn can fail, the proposal generator, peer reviewer, and failure resolver are all required for every run; the engine checks they are present before the first turn.
@@ -121,7 +121,8 @@ $d66$ uses one-based senary (base-six) notation: two digits, each from 1 to 6, i
 
 A proposal is a structured argument:
 * **World-Change Statement:** A single declarative assertion specifying an altered fact in the world benefiting the active actor.
-  It must be new: it may not match an existing canon fact after anchor-style normalization.
+  This wording is narrative guidance for the proposal generator; the engine does not enforce it.
+  The engine does enforce that the statement is new: it may not match an existing canon fact (Section 3.0).
 * **Supporting Arguments (Pros):** 1 to 2 arguments explicitly grounded in existing `canon_facts`.
 
 ### 2.4 Peer Review & Vote Adjustment
@@ -143,14 +144,17 @@ Every non-active actor evaluates the proposal as an independent adjudicator:
    Facts are reusable references: citing one does not consume or mechanically change it.
 
 The numeric difference between final vote and baseline determines whether a shift was attempted; the adapter's `biased_shift_applied` flag does not authorize or prevent one.
-After mechanical validation and any umpire review, the engine sets that flag to whether a non-zero shift remains.
-Invalid or umpire-rejected shifts revert to baseline with the flag false and anchor null; unchanged votes also have the flag false and anchor null.
-Remaining shifted votes retain the normalized anchor.
+Mechanical validation runs first and produces the *mechanically validated evaluation*.
+In it, the engine has set `biased_shift_applied` to whether a valid non-zero shift remains, and has replaced a valid anchor with the original text of the canon fact it matched.
+Invalid shifts revert to baseline with the flag false and anchor null; unchanged votes also have the flag false and anchor null.
+`UmpireReview` receives the mechanically validated evaluations, and `evaluation_before_reversion` stores them in exactly that form.
+An umpire-rejected shift then reverts to baseline with the flag false and anchor null.
+A retained `cited_anchor` therefore always appears verbatim in `canon_facts`.
 
 Correctly cited shifts proceed unless the umpire rejects them through the optional pre-roll callback in Section 3.5.
 There is no mandatory vote-approval pause when that callback is absent.
 Rejections are applied before summing votes or rolling resolution dice; they restore `baseline_plausibility`, not a new vote chosen by the umpire.
-The original evaluation and the umpire's reason are retained in the turn record.
+The mechanically validated evaluation and the umpire's reason are retained in the turn record.
 This optional pre-roll review is separate from the umpire resolution required after a failed roll.
 
 ### 2.5 Matrix Adjudication & State Mutation
@@ -186,7 +190,7 @@ If there are no peers, the umpire supplies the consequence.
 
 The result must describe a concrete new event or condition explaining the failed proposal, such as "The buyer fails to pay because it went bankrupt."
 It is a new canonical outcome, not merely an audit note or a repeated fact.
-The engine checks that the statement is non-blank and not already present in canon after the same whitespace/outer-quote normalization used for anchors.
+The engine checks that the statement is a non-whitespace string and matches no canon fact (Section 3.0).
 It must not match the rejected proposal's world-change statement either.
 The umpire judges its narrative suitability and novelty beyond those mechanical checks.
 The consequence enters the run's working `canon_facts` immediately, so the next actor sees the changed world even if the requested turns end before a round completes.
@@ -197,11 +201,36 @@ The turn record preserves the source actor when applicable, the original argumen
 
 ## 3. State Schema & Data Models
 
+### 3.0 Value Rules & Text Normalization
+
+These rules apply to every contract value, including values returned by adapters and umpire callbacks.
+
+*Normalization* of a string is defined once, as follows:
+
+1. Remove leading and trailing whitespace, using Python `str.strip()` semantics.
+2. If the result is at least two characters long and starts and ends with the same ASCII quote character (`"` or `'`), remove that one pair.
+3. Remove leading and trailing whitespace again, using `str.strip()`.
+
+No other characters, including typographic quotes, are removed, and letter case is preserved.
+Two strings *match* when their normalized forms are equal.
+Every narrative-text comparison in this specification normalizes both sides: citation anchors, supporting-pro `source_ref` values, proposal novelty, failure-consequence novelty, and duplicate checks within `canon_facts`.
+Actor IDs are identifiers, not narrative text.
+Normalization applies only to the check that no two actor IDs match.
+Every reference to an actor ID, in `first_round_order`, `voter_actor_id`, `UmpireRejection.voter_actor_id`, or `source_voter_actor_id`, must equal an existing ID exactly, with no normalization.
+
+A *non-whitespace string* is a string whose normalized form is not empty.
+The engine stores and returns the original text, not its normalized form.
+The one exception is a valid `cited_anchor`, which mechanical validation replaces with the original text of the canon fact it matched (Section 2.4).
+
+Integer fields must be JSON integers or Python `int` values; booleans are never accepted as integers.
+An integer outside its declared range, such as `final_vote: 2`, is malformed and is never clamped.
+A value of the wrong type or shape is malformed: it raises `InvalidRunRequestError` in the request, `ProposalGenerationError` in proposal-generator output, `PeerReviewError` in peer-reviewer output, and the matching umpire error in umpire-callback output.
+
 ### 3.1 World State
 
 All listed fields are required except fields explicitly marked optional elsewhere.
 Object fields reject undeclared properties.
-Integer fields are JSON integers, not booleans; string fields have no maximum length unless a non-empty constraint is stated.
+String fields have no maximum length.
 
 ```json
 {
@@ -215,7 +244,7 @@ Integer fields are JSON integers, not booleans; string fields have no maximum le
     "turn_index": { "type": "integer", "minimum": 0 },
     "canon_facts": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": { "type": "string", "pattern": "\\S" }
     },
     "actors": {
       "type": "array",
@@ -224,7 +253,7 @@ Integer fields are JSON integers, not booleans; string fields have no maximum le
         "additionalProperties": false,
         "required": ["id", "name", "agenda"],
         "properties": {
-          "id": { "type": "string", "minLength": 1 },
+          "id": { "type": "string", "pattern": "\\S" },
           "name": { "type": "string" },
           "agenda": { "type": "string" }
         }
@@ -238,13 +267,16 @@ Integer fields are JSON integers, not booleans; string fields have no maximum le
 
 ```text
 Actor = {
-  id: non-empty string, unique within WorldState.actors,
+  id: non-whitespace string, unique within WorldState.actors,
   name: string,
   agenda: string
 }
 ```
 
-For every actor, `id` must be non-empty and unique in the world state.
+For every actor, `id` must be a non-whitespace string, and no two actor IDs may match.
+The JSON Schema `pattern` only rejects whitespace-only values; the full normalization rule in Section 3.0 still applies, so an ID such as `""` (two quote characters) is also invalid.
+Every `canon_facts` entry must be a non-whitespace string, and no two entries may match.
+A blank or duplicate canon fact rejects the run with `InvalidRunRequestError`, so a blank anchor can never pass the grounding gate.
 Actor traits are deferred from this revision; actors contain only `id`, `name`, and `agenda`.
 Name and agenda supply narrative context, not grounding evidence.
 Actor capabilities or conditions may be cited only if stated in `canon_facts`.
@@ -266,10 +298,12 @@ Proposal = {
   posture_roll: integer in [1, 6],
   trio_tier: TrioTier,
   spark_tags: string[] with exactly 2 tags from distinct randomly selected tables,
-  world_change_statement: non-whitespace string not already in canon_facts,
-  supporting_pros: SupportingPro[1..2] with at least 1 grounded entry after pruning
+  world_change_statement: non-whitespace string,
+  supporting_pros: SupportingPro[1..2], all matching canon facts after pruning
 }
 ```
+
+The proposal's statement must not match any canon fact; that semantic check is described in Section 3.5.
 
 ```json
 {
@@ -324,7 +358,7 @@ The human umpire decides whether it can be used directly, must be restated, or i
 
 The caller supplies a full world state and a positive number of turns, with optional spark-table overrides, actor order for the first round, and random seed.
 If `first_round_order` is omitted, the engine creates a random permutation; when `seed` is supplied, that permutation is reproducible.
-The supplied order must contain every actor ID exactly once.
+The supplied order must contain every actor ID exactly once, each written exactly as in `WorldState.actors` (Section 3.0).
 The engine repeats that order until the requested number of turns has completed.
 
 The interface types are:
@@ -355,11 +389,12 @@ SparkTables = {
 }
 
 D66 = exactly the 36 keys with tens and units digits from 1 through 6;
-      JSON serializes each key as its decimal string
+      JSON serializes each key as its decimal string;
+      Python callers may use either decimal-string or int keys, but not both in one table
 
 TurnRecord = {
   turn_index: integer >= 1,             // value after this turn's tick
-  session_index: integer >= 0,          // completed-round count after this turn
+  session_index: integer >= 0,          // world session_index after this turn
   active_actor_id: string,
   proposal: Proposal,
   peer_evaluations: PeerEvaluation[],
@@ -376,7 +411,7 @@ StateChange = {
   path: string,                        // JSON Pointer to a changed top-level field
   before: JSON value,
   after: JSON value,
-  reason: string                       // engine-generated: the rule or umpire decision behind the change
+  reason: ReasonCode                   // exactly one code per changed field
 }
 
 UmpireRejection = {
@@ -562,7 +597,7 @@ In this example, the base roll of 7 receives a -1 peer modifier, so the proposal
       "failure_resolution": {
         "source_voter_actor_id": "actor_dock_syndicate",
         "world_change_statement": "The Dock Syndicate blocks the approach, preventing the Iron Choir from claiming the conduit.",
-        "rationale": "The only peer has the lowest final vote; the umpire confirms its blocking argument as the cause of failure."
+        "rationale": "The only peer has the lowest final vote; the umpire restates its blocking argument as a concrete event."
       },
       "state_changes": [
         {
@@ -572,13 +607,13 @@ In this example, the base roll of 7 receives a -1 peer modifier, so the proposal
             "The conduit is open.",
             "The Dock Syndicate blocks the approach, preventing the Iron Choir from claiming the conduit."
           ],
-          "reason": "The umpire-resolved blocking event explains why the claim fails."
+          "reason": "failure-consequence"
         },
         {
           "path": "/turn_index",
           "before": 0,
           "after": 1,
-          "reason": "One simulation turn completed."
+          "reason": "turn-tick"
         }
       ]
     }
@@ -587,7 +622,7 @@ In this example, the base roll of 7 receives a -1 peer modifier, so the proposal
 ```
 
 Each `turn_record` preserves the proposal and its grounded pros, its `trio_tier`, its two selected table names/entry values in `spark_tags`, all peer evaluations after mechanical validation and any umpire rejections, the clamped net vote modifier, resolution roll and adjusted total, success or failure, and the state changes applied by that turn.
-`umpire_rejections` preserves the original mechanically validated evaluation and the user's reason for each rejected shift, in peer-evaluation order.
+`umpire_rejections` preserves the mechanically validated evaluation (Section 2.4), with its engine-set flag and canon-text anchor, and the user's reason for each rejected shift, in peer-evaluation order.
 An empty list means no umpire rejections were applied, not that a human approved every vote.
 `failure_resolution` is null for Success and contains the validated umpire decision for Failure.
 For a peer-sourced consequence, `source_voter_actor_id` identifies a lowest-voted peer whose original `public_argument` remains available in `peer_evaluations`.
@@ -598,28 +633,51 @@ The record explains why the final state changed; it is not a UI-formatted dossie
 `peer_evaluations` contains exactly one evaluation for each non-active actor, in the order those actors appear in the input `WorldState`.
 `state_changes` contains each changed top-level `WorldState` field exactly once, ordered by ascending JSON Pointer.
 Each entry's `before` and `after` are the complete JSON values of that field.
-`reason` is engine-generated text naming, in execution order, each engine rule or umpire decision that affected the field.
-For a failure consequence, `reason` refers to the umpire's decision; the umpire's own explanation is in `failure_resolution.rationale`.
+`reason` is engine-generated and uses only these `ReasonCode` values:
+
+| `ReasonCode` | Field it explains | Applied when |
+| :--- | :--- | :--- |
+| `proposal-succeeded` | `/canon_facts` | The adjusted total is at least 7 and the proposal is appended. |
+| `failure-consequence` | `/canon_facts` | The adjusted total is below 7 and the umpire-resolved consequence is appended. |
+| `turn-tick` | `/turn_index` | Every resolved turn. |
+| `round-complete` | `/session_index` | The turn completes a pass through the run order. |
+
+In Interface Contract 1.1.0 each changed field is explained by exactly one code, so `reason` is always a single `ReasonCode`.
+The narrative explanation of a failure lives in `failure_resolution`, not in `reason`.
 Given the same inputs and umpire decisions, the engine produces the same `reason` text.
 These values represent the net change at the end of the turn, including counter updates.
 A completed run contains exactly `turn_count` records, including failed attempts; errors use one of the `RunError` types and never include a partial result.
 
 The proposal's `active_actor_id` must equal the actor taking the turn; its `posture_roll` is the engine's turn-local posture-die roll, and its `trio_tier` must match that roll.
 Its two spark tags must match the d66 entries from the independently selected distinct tables in selection order, not a tier-specific pairing.
-Each peer evaluation's voter ID must identify a distinct non-active actor.
-A caller-supplied state must contain every field in Section 3.1; actor IDs are non-empty and unique.
+Each peer evaluation's `voter_actor_id` must equal the actor the peer reviewer was asked to represent; a mismatch is malformed output and raises `PeerReviewError`.
+A caller-supplied state must contain every field in Section 3.1; actor IDs and canon facts are non-whitespace strings, and no two of either may match.
 All contract objects reject undeclared fields.
 
-### 3.5 Engine-Side Adapters & Umpire Callbacks
+### 3.5 Runner Entry Point, Adapters & Umpire Callbacks
 
-The runner invokes two engine-side adapters, may invoke the optional pre-roll `UmpireReview`, and invokes `FailureResolver` after every failed roll.
-`ProposalGenerator`, `PeerReviewer`, and `FailureResolver` are required for every run, because any turn can fail; `UmpireReview` is optional.
-The engine checks the required callables are present before the first turn; a missing one raises `InvalidRunRequestError` before any adapter call or random draw.
-None is part of the serialized `RunRequest`; how a UI or bridge gathers the human user's decisions is outside this specification:
+The caller starts a run through a single entry point and passes every callable to it:
+
+```text
+run(
+  request: RunRequest,
+  proposal_generator: ProposalGenerator,
+  peer_reviewer: PeerReviewer,
+  failure_resolver: FailureResolver,
+  umpire_review: UmpireReview | None = None
+) -> RunResult            // or raises a RunError
+```
+
+The caller owns all four callables, including the LLM-backed proposal generator and peer reviewer.
+`proposal_generator`, `peer_reviewer`, and `failure_resolver` are required for every run, because any turn can fail; `umpire_review` is optional.
+A required argument is *missing* when it is `None` or not callable; a missing one raises `InvalidRunRequestError` before any callable is invoked or random number drawn.
+`umpire_review` may be `None`; any other non-callable value also raises `InvalidRunRequestError`.
+Each callable returns a plain mapping or an equivalent model with exactly the declared fields, and the strict value rules of Section 3.0 apply to it.
+None of the callables is part of the serialized `RunRequest`; how a UI or bridge gathers the human user's decisions is outside this specification:
 
 ```text
 ProposalDraft = {
-  world_change_statement: non-whitespace string not already in canon_facts,
+  world_change_statement: non-whitespace string,
   supporting_pros: SupportingPro[1..2]
 }
 
@@ -654,13 +712,22 @@ FailureResolver(
 ```
 
 The proposal generator returns only a `ProposalDraft`; the engine creates the complete `Proposal` by attaching the active actor ID, posture roll, TriO tier, and spark tags already resolved for that turn.
-Each adapter must return the declared schema and must not mutate its arguments.
+Each callable must return the declared schema and must not mutate its arguments.
 The runner supplies isolated snapshots of the current state and proposal.
-Provider/network errors or malformed output become `ProposalGenerationError` or `PeerReviewError`.
-The engine applies grounding and voting validation to returned values.
-It prunes ungrounded proposal pros; if no grounded pro remains, it raises `InvalidProposalError` without automatically retrying.
 Any adapter retry policy is outside the engine contract.
-Engine errors expose the stable code and message represented by `RunFailure`; an execution bridge maps those values into its chosen transport response without returning partial state.
+Engine errors expose the stable `code` and a human-readable `message` through `RunFailure`; only `code` is part of the stable contract, and an execution bridge maps them into its chosen transport response without returning partial state.
+
+Proposal-generator output is checked in this order, and the first failing check decides the error:
+
+1. **Shape:** a provider/network error, a missing or extra field, a wrong type, an out-of-range integer, a blank `world_change_statement`, a `source_type` other than `"canon_fact"`, or fewer than 1 or more than 2 supporting pros raises `ProposalGenerationError`.
+2. **Novelty:** a `world_change_statement` that matches a canon fact raises `InvalidProposalError`.
+3. **Grounding:** each supporting pro whose `source_ref` does not match a canon fact is pruned; if none remain, the engine raises `InvalidProposalError`.
+
+The engine never retries or regenerates a proposal.
+The peer reviewers, the turn record, and the umpire callbacks all receive the pruned proposal; pruned pros are not retained.
+
+Peer-reviewer output that has a provider/network error, a missing or extra field, a wrong type, an out-of-range integer, or a `voter_actor_id` not exactly equal to the requested voter's ID raises `PeerReviewError`.
+Well-formed evaluations then pass the vote checks in Section 2.4: a two-step shift or an invalid anchor reverts the vote to baseline instead of raising an error.
 
 If configured and at least one valid shifted vote remains after mechanical checks, the runner invokes `UmpireReview` once before computing the turn's modifier.
 It receives isolated snapshots of the proposal, all mechanically validated evaluations, and the pre-resolution world state.
@@ -690,7 +757,7 @@ When the chosen `public_argument` is suitable, its text is the consequence; othe
 If none of the candidates provides a usable source, or no peers exist, the umpire may supply the consequence with a null source and a rationale explaining that decision.
 The engine validates the source ID and non-blank fields but does not independently decide whether ordinary pro/con reasoning is narratively suitable.
 
-The returned statement must remain non-blank after anchor-style normalization and must not equal any normalized canon fact or the rejected proposal's normalized statement.
+The returned statement must be a non-whitespace string and must match neither any canon fact nor the rejected proposal's statement (Section 3.0).
 The original returned text is stored in canon and the audit record after those checks.
 The engine records the validated decision in `failure_resolution` and applies it before the next actor's turn.
 On Success, `FailureResolver` is not invoked and `failure_resolution` is null.
@@ -705,9 +772,9 @@ It must not replace the sampled tables with a tier-specific pair or treat their 
 The active actor and current world state provide narrative context; only `canon_facts` provides grounding references.
 
 An empty or whitespace-only world-change statement is malformed proposal output and raises `ProposalGenerationError` before adjudication; it must never enter canon.
-A statement that matches an existing canon fact after anchor-style normalization raises `InvalidProposalError` before peer review.
+A statement that matches an existing canon fact raises `InvalidProposalError` before peer review.
 The engine does not request regeneration.
-Non-blank statements retain their original text.
+Statements retain their original text.
 
 ---
 
@@ -722,12 +789,12 @@ Non-blank statements retain their original text.
 * **Invariant 3 (Vote Adjustment Limits & Bounds):** Both `baseline_plausibility` and `final_vote` are always $-1$, $0$, or $+1$.
   A shift $(\text{final\_vote} - \text{baseline\_plausibility})$ may be at most one step.
   A two-step shift (from $+1$ to $-1$, or from $-1$ to $+1$) is invalid, and the vote reverts to its baseline.
-* **Invariant 4 (Grounding & Umpire Rejection):** Any non-zero vote shift $(\text{shift} \neq 0)$ requires `cited_anchor` (after stripping whitespace and enclosing quotation marks) to match exactly an existing string in `canon_facts`.
+* **Invariant 4 (Grounding & Umpire Rejection):** Any non-zero vote shift $(\text{shift} \neq 0)$ requires a `cited_anchor` that matches a canon fact (Section 3.0).
   A missing/invalid anchor or human-umpire rejection of the reasoning discards the shift: `final_vote` reverts to `baseline_plausibility`, the shift flag becomes false, and the anchor is cleared.
   Correctly cited shifts remain unless explicitly rejected by the optional callback.
   Valid anchors remain reusable across turns.
-* **Invariant 5 (Proposal Pro Grounding Gate):** Each entry in `supporting_pros` must use `source_type: "canon_fact"` and its normalized `source_ref` must match a known canon fact.
-  Ungrounded pros are pruned.
+* **Invariant 5 (Proposal Pro Grounding Gate):** Every supporting pro must have `source_type: "canon_fact"`; any other value is malformed output and raises `ProposalGenerationError`.
+  A pro whose `source_ref` matches no canon fact (Section 3.0) is pruned.
   The proposal proceeds only if at least 1 grounded pro remains; otherwise, the run fails with `InvalidProposalError` and the engine does not regenerate the proposal.
 * **Invariant 6 (Narrative-Only Trackers):** Actor conditions exist only as narrative statements in `canon_facts`.
   They are not consumed, recovered, stepped, or used as automatic numeric modifiers.
@@ -752,8 +819,9 @@ Non-blank statements retain their original text.
   Within a request, `session_index` increments once after every complete pass through that request's order; it does not increment for an incomplete final pass.
   A new request starts a new order rather than resuming an incomplete pass.
   There are no round-end tracker resets.
-* **Invariant 13 (Unique Actor Identity):** Actor IDs must be unique and non-empty so that each run order identifies exactly one actor per turn.
+* **Invariant 13 (Unique Actor Identity):** Actor IDs must be non-whitespace strings with no two matching (Section 3.0), so that each run order identifies exactly one actor per turn.
 * **Invariant 14 (Seeded Draw Order):** If `first_round_order` is omitted, `rng.shuffle` consumes the run's first random draws.
+  The shuffle input is a new list of the actor IDs in `WorldState.actors` order; the engine never sorts it first.
   Each turn draws one posture d6 with `rng.randint(1, 6)`, then selects two distinct tables with `rng.sample(["Action", "Focus", "Method", "Disposition", "Motivation"], 2)`.
   Preserve sample order.
   In that order, roll one d66 per table using two `rng.randint(1, 6)` calls (tens, then units), and convert to tens-times-ten plus units.
@@ -762,6 +830,9 @@ Non-blank statements retain their original text.
   Neither tier, table contents, nor umpire decisions changes this draw sequence; JSON object key order must not affect table selection.
   * **Golden Vector (Python 3.11):** With seed `42`, actor IDs `["actor_a", "actor_b"]`, and no supplied order, shuffle produces `["actor_b", "actor_a"]`.
     The first posture roll is `1` (Obvious), selected tables are `Method` then `Focus`, their d66 rolls are `22` and `61`, and resolution dice are `6` and `6` (base total `12`).
+  * **Golden Vector, Unsorted Input (Python 3.11):** With seed `4`, `WorldState.actors` in the order `["actor_c", "actor_a", "actor_b"]`, and no supplied order, shuffle produces `["actor_b", "actor_a", "actor_c"]`.
+    Shuffling the sorted list `["actor_a", "actor_b", "actor_c"]` would instead produce `["actor_c", "actor_b", "actor_a"]`, so this vector detects an implementation that sorts first.
+    The first posture roll is `1` (Obvious), selected tables are `Disposition` then `Motivation`, their d66 rolls are `21` and `11`, and resolution dice are `4` and `5` (base total `9`).
 * **Invariant 15 (Explicit Failure Types):** Invalid requests and missing required callables raise `InvalidRunRequestError` before the first turn; proposal generation, invalid proposals, peer review, umpire review, umpire failure resolution, and mechanics failures raise their corresponding `RunError` type.
   No engine-level retry or partial result is permitted.
   `MechanicsError` signals a violated internal engine invariant, such as a die result, table lookup, or counter outside its defined range.
@@ -774,7 +845,7 @@ Non-blank statements retain their original text.
   Multiple lowest-vote candidates require an umpire selection rather than a deterministic or random engine tie-break.
   A selected peer source must belong to this set; the umpire may supply a null-source consequence when no candidate is usable or no peers exist.
 * **Invariant 18 (New Failure Consequence):** Every resolved Failure appends exactly one new, umpire-resolved statement to canon before the next actor acts.
-  The statement must not normalize to an existing canon fact or to the rejected proposal.
+  The statement must not match an existing canon fact or the rejected proposal (Section 3.0).
   When an argument is restated, only the returned consequence enters canon; the original argument remains in the audit record.
   A failed turn that only updates counters is not a valid resolved outcome.
 
@@ -786,22 +857,23 @@ Non-blank statements retain their original text.
 
 The engine accepts a `RunRequest` as defined in Section 3.4: a complete `WorldState`, positive `turn_count`, and optional `spark_tables`, `first_round_order`, and `seed`.
 No passcode, transport token, file path, storage location, or deployment trigger is an engine input.
-Alongside the request, the caller supplies the required `ProposalGenerator`, `PeerReviewer`, and `FailureResolver` callables and, optionally, `UmpireReview` (Section 3.5).
+The caller passes the request and the required `proposal_generator`, `peer_reviewer`, and `failure_resolver` callables, plus the optional `umpire_review`, to the `run` entry point (Section 3.5).
 
 ### Turn Execution
 
 1. Validate the complete world state, unique actor IDs, positive `turn_count`, optional order permutation, and any supplied complete `spark_tables` override before executing any turn.
    A run requires at least one actor.
    Invalid supplied tables fail validation; they do not trigger a fallback.
-   Confirm that `ProposalGenerator`, `PeerReviewer`, and `FailureResolver` are all supplied; a missing one raises `InvalidRunRequestError` before any adapter call or random draw.
+   Confirm that canon facts and actor IDs are non-whitespace strings with no two matching (Section 3.0), and that `contract_version` is `"1.1.0"`.
+   Confirm that `proposal_generator`, `peer_reviewer`, and `failure_resolver` are callable and that `umpire_review` is `None` or callable; otherwise raise `InvalidRunRequestError` before any callable is invoked or random number drawn.
 2. Select the built-in `trio-d66-v1` tables if `spark_tables` is omitted; otherwise use the valid caller-supplied set unchanged.
    Create one `random.Random` instance from the non-negative `seed`, or system entropy when omitted.
-   Select the first-round order from the supplied permutation, or shuffle the actor IDs with that instance.
+   Select the first-round order from the supplied permutation, or shuffle the actor IDs, taken in `WorldState.actors` order, with that instance.
 3. Execute exactly `turn_count` turns, advancing through the order and restarting at its first actor after each complete pass:
    a. Roll the posture die and map the result to its TriO tier.
       Independently sample two distinct tables, roll one d66 entry from each, and construct their spark tags in selection order.
-   b. Generate a `ProposalDraft` through the engine-side proposal-generation integration; the engine attaches the already-resolved active actor ID, posture roll, TriO tier, and spark tags to form the `Proposal`.
-   c. Reject a proposal statement that already matches a normalized canon fact with `InvalidProposalError`.
+   b. Generate a `ProposalDraft` through the caller-supplied `proposal_generator`; the engine attaches the already-resolved active actor ID, posture roll, TriO tier, and spark tags to form the `Proposal`.
+   c. Check the proposal-generator output in the order defined in Section 3.5: shape, then novelty against `canon_facts`, then pruning of ungrounded pros.
       Validate and prune proposal pros against `canon_facts` only; if none remain, fail with `InvalidProposalError`.
    d. Obtain one peer evaluation from every non-active actor, then apply shift and canon-fact grounding validation without consuming any fact.
    e. If an umpire callback is configured and any shifted votes remain, obtain its rejections and validate them.
@@ -835,7 +907,7 @@ A caller may persist the returned state and turn records as it chooses.
 * **Edge Case 1: Repeated Fact Citations:** The same canon fact may ground multiple turns.
   Citations neither consume references nor create tracker state.
 * **Edge Case 2: Hallucinated Anchor Strings:** Peer reviews might include leading/trailing whitespace or enclosing quotes.
-  The linter gate strips outer whitespace and one matching enclosing quote pair before checking exact membership.
+  The linter gate compares the citation with `canon_facts` using the normalization in Section 3.0, which strips outer whitespace and one matching ASCII quote pair from both sides.
   If not found in `canon_facts`, the shift is reverted.
 * **Edge Case 3: One Actor:** A one-actor run is valid; it has no peer evaluations, so the net modifier is $0$.
   On Failure, the umpire supplies a new consequence with `source_voter_actor_id: null`.
@@ -844,9 +916,9 @@ A caller may persist the returned state and turn records as it chooses.
   Higher and lower totals do not create additional outcome bands.
   Success adds the new proposal statement, a turn record, and a time tick.
   Failure produces a new consequence, a turn record, and a time tick after umpire resolution.
-* **Edge Case 5: Invalid Run Request:** A non-positive `turn_count`, negative seed, empty actor set, duplicate/empty actor ID, undeclared tracker field, or `first_round_order` that is not an exact permutation is rejected with `InvalidRunRequestError` before execution.
+* **Edge Case 5: Invalid Run Request:** A non-positive `turn_count`, negative seed, empty actor set, blank or matching actor IDs, blank or matching canon facts, an undeclared field, a boolean where an integer is expected, a `contract_version` other than `"1.1.0"`, or a `first_round_order` that is not an exact permutation is rejected with `InvalidRunRequestError` before execution.
   The caller's input state remains untouched.
-* **Edge Case 6: Proposal or Peer-Review Failure:** Any engine-side proposal or peer-review integration failure, including malformed output, aborts with `ProposalGenerationError` or `PeerReviewError`.
+* **Edge Case 6: Proposal or Peer-Review Failure:** Any caller-supplied proposal-generator or peer-reviewer failure, including malformed output, aborts with `ProposalGenerationError` or `PeerReviewError`.
   The engine does not retry.
   No partial state or turn records are returned.
 * **Edge Case 7: Proposal Without Grounded Pros:** Ungrounded pros are pruned.
@@ -858,7 +930,7 @@ A caller may persist the returned state and turn records as it chooses.
   A supplied null payload, missing or extra table name, extra or missing d66 key, or non-string/blank entry is rejected with `InvalidRunRequestError` before execution.
   Invalid overrides are never silently replaced with defaults.
 * **Edge Case 10: Umpire Rejects a Cited Shift:** Even an exact canon citation does not prevent rejection of illogical reasoning.
-  Revert the vote to its original baseline before aggregation, clear its shift flag and anchor, and preserve the original evaluation and reason in `umpire_rejections`.
+  Revert the vote to its original baseline before aggregation, clear its shift flag and anchor, and preserve the mechanically validated evaluation and reason in `umpire_rejections`.
   A valid rejection is normal adjudication, not an engine failure.
 * **Edge Case 11: Optional Pre-Roll Intervention:** An absent `UmpireReview`, no remaining shifted votes, or an empty rejection list adds no vote-approval requirement.
   Mechanically valid shifts proceed.
@@ -868,7 +940,7 @@ A caller may persist the returned state and turn records as it chooses.
   Select candidates at the lowest final value anyway.
   If their pro/con arguments do not explain failure, the umpire restates or supplies a new consequence instead of treating supportive wording as an established failure event.
 * **Edge Case 13: Unsuitable or Repeated Failure Statement:** The umpire may restate a selected argument or supply a consequence if no candidate is usable.
-  Returning a blank statement, an existing normalized canon fact, or the rejected proposal raises `UmpireResolutionError`.
+  Returning a blank statement, a statement matching a canon fact, or the rejected proposal raises `UmpireResolutionError`.
   The engine must not silently complete the turn with no narrative change.
 * **Edge Case 14: Missing or Invalid Failure Decision:** A missing `FailureResolver` is rejected with `InvalidRunRequestError` before the first turn, not discovered at the first failed roll.
   At a failed roll, a missing or invalid decision raises `UmpireResolutionError`.
@@ -877,9 +949,13 @@ A caller may persist the returned state and turn records as it chooses.
 * **Edge Case 15: Proposal Already in Canon:** A proposal whose normalized statement matches an existing canon fact would add nothing on Success.
   It is rejected with `InvalidProposalError` before peer review, so no peer calls or resolution dice are spent on it.
   The engine does not request regeneration.
-* **Edge Case 16: Missing Required Callable:** A run without `ProposalGenerator`, `PeerReviewer`, or `FailureResolver` is rejected with `InvalidRunRequestError` before the first turn.
-  This applies even when the run might never need the callable, such as `PeerReviewer` in a one-actor run or `FailureResolver` in a run that would succeed every turn.
-  No adapter is called, no random number is drawn, and the caller's state is untouched.
+* **Edge Case 16: Missing Required Callable:** A `run` call whose `proposal_generator`, `peer_reviewer`, or `failure_resolver` is `None` or not callable is rejected with `InvalidRunRequestError` before the first turn.
+  This applies even when the run might never need the callable, such as `peer_reviewer` in a one-actor run or `failure_resolver` in a run that would succeed every turn.
+  No callable is invoked, no random number is drawn, and the caller's state is untouched.
+* **Edge Case 17: Malformed Adapter Output:** Every adapter-output defect maps to exactly one error, using the check order in Section 3.5.
+  A wrong type (including a boolean for an integer), an out-of-range integer, a missing or extra field, a non-`"canon_fact"` source type, or a pro count outside 1–2 is a shape error (`ProposalGenerationError` or `PeerReviewError`).
+  A peer evaluation for the wrong voter is a `PeerReviewError`.
+  A proposal duplicating canon, or with no grounded pro left after pruning, is an `InvalidProposalError`.
 
 ---
 
@@ -889,8 +965,8 @@ A caller may persist the returned state and turn records as it chooses.
 
 * **Posture Die to TriO Tier Mapping:** Exhaustively assert faces 1-3 map to Obvious, 4-5 to Option, and 6 to Odd; every actor uses the same mapping.
   Assert no tier filters or replaces the random table selection.
-* **Seeded Random Sequence:** Assert golden vectors for seeded actor-order shuffling, posture d6, two-table sampling, both d66 lookups, and resolution dice.
-  Verify the canonical sampling list, sample order, and `randint(1, 6)` sequence, including independence from JSON key order.
+* **Seeded Random Sequence:** Assert both golden vectors in Invariant 14, covering seeded actor-order shuffling, posture d6, two-table sampling, both d66 lookups, and resolution dice.
+  Verify the canonical sampling list, sample order, and `randint(1, 6)` sequence, including that the shuffle uses `WorldState.actors` order and is independent of JSON key order.
 * **Spark Table Defaults and Overrides:** Assert omitted `spark_tables` selects `trio-d66-v1`; valid complete overrides produce exact supplied `<TableName>:<entry>` tags and source `request`.
   Reject null payloads, missing/extra table names or d66 keys, and non-string/blank entries without falling back to defaults.
   Table-source selection must not consume RNG draws or alter the table-sampling procedure.
@@ -908,14 +984,18 @@ A caller may persist the returned state and turn records as it chooses.
   Empty decisions leave valid shifts unchanged.
   The separate failure-resolution requirement still applies after a failed roll.
   Callback decisions consume no RNG draws.
-* **Umpire Audit and Errors:** Assert rejected evaluations, original anchors, and user reasons are retained independently in peer order.
+* **Umpire Audit and Errors:** Assert mechanically validated evaluations and user reasons are retained independently in peer order for each rejected shift.
+  For a peer returning baseline `1`, final `0`, `biased_shift_applied: false`, and anchor `'  "The conduit is open."  '` that the umpire rejects, assert `UmpireReview` receives and `evaluation_before_reversion` stores `biased_shift_applied: true` and `cited_anchor: "The conduit is open."`, while the final evaluation has `final_vote: 1`, flag false, and anchor null.
   Reject duplicate/unknown voters, votes already at baseline, blank reasons, malformed returns, and callback failures/cancellation with `UmpireReviewError`; preserve the submitted state and return no partial result.
 * **Proposal and Evaluation Schemas:** Assert adapter output validation, engine attachment of turn mechanics to `ProposalDraft`, and one ordered peer evaluation per non-active actor.
-* **Voting Metadata:** Assert normalized shift flags/anchors follow the numeric shift, grounding checks, and any umpire rejections, including inconsistent adapter flags.
+* **Voting Metadata:** Assert normalized shift flags follow the numeric shift, grounding checks, and any umpire rejections, including inconsistent adapter flags.
+  Assert a retained shift with anchor `'  "The conduit is open."  '` stores `cited_anchor: "The conduit is open."`, the matched canon fact's original text.
+* **Exact Actor-ID References:** Assert `first_round_order` containing `"actor_iron_choir "` raises `InvalidRunRequestError`, and a peer evaluation with `voter_actor_id: "\"actor_dock_syndicate\""` raises `PeerReviewError`.
+  Assert actor IDs `"a"` and `" a "` together are rejected as matching.
   Reject a peer evaluation containing the removed `goal_alignment` field as an undeclared field.
 * **Closed State Schema:** Assert unknown fields are rejected at both world-state and actor-object levels.
 * **Non-Blank Proposals:** Reject empty and whitespace-only statements before any resolution roll or canon insertion.
-* **New Proposals:** Reject a proposal statement matching an existing canon fact after whitespace/outer-quote normalization with `InvalidProposalError`.
+* **New Proposals:** Reject a proposal statement matching an existing canon fact (Section 3.0) with `InvalidProposalError`.
   Assert this happens before any peer review or resolution dice.
 * **Net Modifier Clamping:** Assert extreme positive and negative vote sums clamp strictly at $[-3, +3]$.
 * **Binary Resolution:** Assert adjusted totals 6 and 7 resolve to Failure and Success respectively; all totals below 7 use the failure-consequence path and all totals at least 7 use the success path.
@@ -929,17 +1009,21 @@ A caller may persist the returned state and turn records as it chooses.
   Ties must use the umpire's chosen source rather than a random or alphabetical fallback.
   Suitable arguments may be used directly, while restatements preserve the original argument and source in the audit record.
   If no candidate is usable or there are no peers, accept an umpire-supplied null-source consequence with a rationale.
-* **New Failure State:** Reject blank consequences, canon duplicates after whitespace/outer-quote normalization, and statements matching the rejected proposal.
+* **New Failure State:** Reject blank consequences, statements matching a canon fact (Section 3.0), and statements matching the rejected proposal.
   Assert each resolved Failure changes `canon_facts`, not just the time counters.
 * **Failure Resolver Errors:** Reject a missing decision, unknown or non-lowest sources, invalid fields, and callback failure/cancellation with `UmpireResolutionError`.
   A one-actor failure requires a null source.
   No invalid decision may become a no-op, automatic tie-break, generated fallback, or partial run result.
-* **Required Callables:** Assert a run missing `ProposalGenerator`, `PeerReviewer`, or `FailureResolver` raises `InvalidRunRequestError` before the first turn, with no adapter calls and no random draws.
-  Assert an omitted `UmpireReview` is accepted.
+* **Required Callables:** Assert a `run` call whose `proposal_generator`, `peer_reviewer`, or `failure_resolver` is `None` or not callable raises `InvalidRunRequestError` before the first turn, with no callable invoked and no random draws.
+  Assert `umpire_review=None` is accepted and a non-callable, non-`None` `umpire_review` is rejected.
+* **Normalization:** Assert the Section 3.0 rule with fixed vectors: `'  "Fact"  '` and `"'Fact'"` match `"Fact"`; `'""'` and `"  "` are blank; `"“Fact”"` (typographic quotes) does not match `"Fact"`; `'""Fact""'` loses only one quote pair; letter case is preserved.
+* **Error Classification:** Assert each adapter-output defect in Edge Case 17 raises its single specified error, including a boolean in an integer field, a non-`"canon_fact"` source type, zero or three pros, a canon-duplicate draft, and a mismatched `voter_actor_id`.
+* **Request Validation:** Reject blank or matching canon facts, blank or matching actor IDs, booleans in integer fields, and a `contract_version` other than `"1.1.0"` with `InvalidRunRequestError`.
 * **Narrative State Preservation:** Assert resolution does not automatically change actor records or create mechanical trackers and boons.
   On Failure, only the validated consequence enters canon; unselected arguments and the rejected proposal do not.
-* **State-Change Records:** Assert each changed top-level field appears once, sorted by ascending JSON Pointer, with before/after values and engine-generated reason text that is identical for identical inputs and umpire decisions.
-* **Deferred and Removed Fields:** Reject actor traits, legacy persistent posture/exhaustion fields, and the removed `active_rumors` world-state field as undeclared fields; reject `actor_trait` as a supporting argument's source type.
+* **State-Change Records:** Assert each changed top-level field appears once, sorted by ascending JSON Pointer, with before/after values and a `reason` that is exactly one of the `ReasonCode` values in Section 3.4.
+  Assert a round-ending turn records `round-complete` for `/session_index`.
+* **Deferred and Removed Fields:** Reject actor traits, legacy persistent posture/exhaustion fields, and the removed `active_rumors` world-state field as undeclared fields; reject `actor_trait` as a supporting argument's source type with `ProposalGenerationError`.
 
 ### Integration Tests
 
@@ -954,10 +1038,14 @@ A caller may persist the returned state and turn records as it chooses.
 
 ## 8. Goldfish Review Gates
 
-The [Goldfish review report](../reviews/001_tome_core_architecture_review.md) records the historical 1.0.0 approval and findings on an earlier 1.1.0 draft.
-Human review subsequently changed actor terminology, the spark-table contract, grounding scope, umpire interfaces, and failure-state progression.
-Independent review of the current draft and human approval remain pending.
+The [Goldfish review report](../reviews/001_tome_core_architecture_review.md) records the historical 1.0.0 approval and four zero-context passes on Spec Version 1.1.0, all on 2026-11-11.
+The first review returned `Revisions Required` with six blocking items on normalization, canon-fact validation, error classification, `reason` text, shuffle input order, and the runner entry point.
+The confirmation pass found those six resolved and raised two new blocking items: exact actor-ID references (NEW-01) and the stored form of `cited_anchor` (NEW-02).
+The sign-off check found NEW-01 resolved and one remaining edge of NEW-02: the state of the pre-reversion evaluation (NEW-09).
+The approval check found NEW-09 and NEW-10 resolved, with no new contradictions, and returned `Verdict: Approved`.
+Three non-blocking suggestions remain deferred: returning the effective seed in `RunResult`, pinning a content digest for `trio-d66-v1`, and noting the growth of `before`/`after` snapshots over long runs.
+The human developer signed off the review revisions on 2026-11-11.
 
-- [ ] Zero-context Goldfish review completed for the current Spec Version 1.1.0 draft
-- [ ] Goldfish confirmation of corrected contract gaps for Spec Version 1.1.0
-- [ ] Human developer approval signed off
+- [x] Zero-context Goldfish review completed for the current Spec Version 1.1.0 draft
+- [x] Goldfish confirmation of corrected contract gaps for Spec Version 1.1.0
+- [x] Human developer approval signed off
