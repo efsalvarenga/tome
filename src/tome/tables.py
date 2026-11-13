@@ -1,4 +1,4 @@
-"""Canonical d66 Triple-O spark tables based on Cezar Capacle's framework."""
+"""Canonical d66 TriO spark tables based on Cezar Capacle's Triple-O framework."""
 
 # 36 entries per table, indexed by standard d66 (11..66)
 TABLE_ACTION: dict[int, str] = {

@@ -9,7 +9,7 @@ from tome.validator import (
 
 
 def test_posture_step_die_bounds():
-    """Verify posture step-dice never exceed their physical bounds and map to Triple-O tiers."""
+    """Verify posture step-dice never exceed their physical bounds and map to TriO tiers."""
     for _ in range(500):
         roll, tier = resolve_posture_tier(Posture.STABLE, seed=None)
         assert 1 <= roll <= 4
@@ -226,7 +226,7 @@ def test_outcome_band_state_mutations():
         active_faction_id="f1",
         posture_die="d6",
         posture_roll=2,
-        triple_o_tier="Obvious",
+        trio_tier="Obvious",
         spark_tags=["Action:Attack", "Focus:Resource"],
         world_change_statement="F1 takes over mine.",
         supporting_pros=[SupportingPro(source_type="canon_fact", source_ref="F0", argument="Arg")],
@@ -259,7 +259,7 @@ def test_outcome_band_state_mutations():
         active_faction_id="f1",
         posture_die="d4",
         posture_roll=1,
-        triple_o_tier="Obvious",
+        trio_tier="Obvious",
         spark_tags=[],
         world_change_statement="F1 mines ore.",
         supporting_pros=[SupportingPro(source_type="canon_fact", source_ref="F0", argument="Arg")],
@@ -273,7 +273,7 @@ def test_outcome_band_state_mutations():
         active_faction_id="f1",
         posture_die="d4",
         posture_roll=1,
-        triple_o_tier="Obvious",
+        trio_tier="Obvious",
         spark_tags=[],
         world_change_statement="F1 builds wall.",
         supporting_pros=[SupportingPro(source_type="canon_fact", source_ref="F0", argument="Arg")],
@@ -293,21 +293,21 @@ def test_full_simulation_cycle_e2e():
     from tome.runner import run_simulation_cycle
 
     f1 = Faction(
-        id="fac_iron",
-        name="Iron Choir",
-        agenda="Power",
+        id="actor_a",
+        name="Actor A",
+        agenda="Agenda A",
         posture=Posture.CORNERED,
-        traits=["Scrap Mastery"],
+        traits=["Trait A"],
     )
     f2 = Faction(
-        id="fac_dock",
-        name="Dock Syndicate",
-        agenda="Trade",
+        id="actor_b",
+        name="Actor B",
+        agenda="Agenda B",
         posture=Posture.STABLE,
-        traits=["Harbor Control"],
+        traits=["Trait B"],
     )
     state = WorldState(
-        session_index=1, canon_facts=["The Conduit is open."], active_rumors=[], factions=[f1, f2]
+        session_index=1, canon_facts=["Fact 1."], active_rumors=[], factions=[f1, f2]
     )
 
     def mock_proposal(fac, tier, tags, s):
@@ -315,13 +315,11 @@ def test_full_simulation_cycle_e2e():
             active_faction_id=fac.id,
             posture_die="d8" if fac.posture == Posture.CORNERED else "d4",
             posture_roll=1,
-            triple_o_tier=tier.value,
+            trio_tier=tier.value,
             spark_tags=tags,
-            world_change_statement=f"{fac.name} claims the conduit.",
+            world_change_statement=f"{fac.name} achieves outcome X.",
             supporting_pros=[
-                SupportingPro(
-                    source_type="canon_fact", source_ref="The Conduit is open.", argument="Open."
-                )
+                SupportingPro(source_type="canon_fact", source_ref="Fact 1.", argument="Open.")
             ],
         )
 
@@ -331,7 +329,7 @@ def test_full_simulation_cycle_e2e():
             baseline_plausibility=1,
             goal_alignment="hostile",
             biased_shift_applied=True,
-            cited_anchor="The Conduit is open.",
+            cited_anchor="Fact 1.",
             final_vote=0,
             public_argument=f"{voter.name} opposes this.",
         )
@@ -343,6 +341,8 @@ def test_full_simulation_cycle_e2e():
     assert updated_state.session_index == 2
     assert len(proposals) == 2
     assert len(evals) == 2
+    for proposal in proposals:
+        assert proposal.model_dump()["trio_tier"] in {tier.value for tier in PostureTier}
     # Verify exhausted traits are clean at cycle conclusion
     for f in updated_state.factions:
         assert len(f.exhausted_traits) == 0

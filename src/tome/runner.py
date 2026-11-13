@@ -16,7 +16,7 @@ PeerReviewer = Callable[[Faction, Proposal, WorldState], PeerEvaluation]
 
 
 def get_paired_spark_tags(tier: PostureTier, seed: int | None = None) -> list[str]:
-    """Roll 2x d66 on paired tables corresponding to Triple-O tier."""
+    """Roll 2x d66 on paired tables corresponding to TriO tier."""
     r1 = roll_d66(seed)
     r2 = roll_d66(seed + 1 if seed is not None else None)
 
@@ -70,7 +70,7 @@ def run_simulation_cycle(
         # b. Generate proposal
         raw_proposal = proposal_fn(current_fac, tier, spark_tags, state)
         raw_proposal.posture_roll = roll
-        raw_proposal.triple_o_tier = tier.value
+        raw_proposal.trio_tier = tier.value
         raw_proposal.spark_tags = spark_tags
 
         # c. Validate & prune proposal
