@@ -4,21 +4,22 @@
 
 | Metadata | Value |
 | :--- | :--- |
-| Spec Version | 1.1.1 |
+| Spec Version | 1.1.2 |
 | Interface Contract Version | 1.1.0 |
 | Status | Approved |
 | Author | Elephant Agent & Developer |
 | Target Milestone | v0.1.0 (Core Engine & Pure-Python Mechanics) |
 
-### Changelog
+## Changelog
 
 | Spec Version | Summary |
 | :--- | :--- |
+| 1.1.2 | Review resolution, 2026-11-14: documented alternatives, caller-owned workload budgets and runtime limits, append-only historical canon, and trusted-adapter boundaries; corrected callback return guidance, audit/determinism wording, review-history labels, and Markdown layout. Interface Contract 1.1.0 is unchanged; the review loop converged on 2026-11-14 and the human developer signed off on 2026-11-17. |
 | 1.1.1 | Editorial, 2026-11-13: replaced setting-specific example text with neutral placeholders (Actor A, Actor B, "Fact 1.", "outcome X") so the specification describes no particular scenario. No change to the interface contract, mechanics, rules, or tests; the Goldfish approval of 1.1.0 applies unchanged. |
-| 1.1.0 | Approved 2026-11-11 after Goldfish review: standardized TriO and actor terminology; replaced persistent posture and step-dice with a per-turn d6; provided default spark tables with complete caller overrides and tier-independent random selection; simplified resolution to 2d6 plus peer votes against 7+; deferred actor traits and retained canon-only grounding; removed mechanical trackers, exhaustion, boons, and outcome bands; added optional pre-roll umpire rejection of illogical shifts and mandatory umpire resolution of failures into new canon consequences based on the lowest final peer votes; required proposals to be new to canon so every resolved turn, Success or Failure, adds exactly one new fact; removed the descriptive `goal_alignment` field from peer evaluations; defined the `Actor` and `TrioTier` types, distinguished the posture die from its TriO tier, and removed the constant `posture_die` field; removed the unused `active_rumors` world-state field; clarified engine-generated state-change reasons and when `MechanicsError` applies; required the proposal generator, peer reviewer, and failure resolver to be checked before the first turn; after Goldfish review, defined a single text-normalization rule and strict value rules (Section 3.0), required non-blank and non-matching canon facts, fixed one error per adapter-output defect, defined a `ReasonCode` vocabulary for `StateChange.reason`, pinned the seeded shuffle input to `WorldState.actors` order with a second golden vector, and defined the caller-owned `run` entry point; after Goldfish confirmation, compared actor-ID references exactly, stored retained anchors as the matched canon fact's text, fixed that substitution at mechanical validation so the umpire and `evaluation_before_reversion` see the same form, and treated out-of-range integers as malformed; bumped the interface contract to 1.1.0 for the changed actor schema, binary outcome, umpire callbacks, and `failure_resolution`/`umpire_rejections` records, as a draft pending approval. |
+| 1.1.0 | Approved 2026-11-11 after four Goldfish passes: adopted per-turn d6 tiers, tier-independent spark sampling, canon-only grounding, binary 2d6 resolution against 7, optional pre-roll umpire rejections, mandatory failure consequences, strict value/error rules, seeded draw order, and the caller-owned run contract. Removed persistent posture, traits/exhaustion, boons, outcome bands, `goal_alignment`, and `active_rumors`. Interface Contract 1.1.0; detailed review chronology is recorded in Section 8. |
 | 1.0.0 | Retained the engine mechanics and defined a transport-neutral multi-turn execution contract. Removed UI, hosting, authentication, deployment, persistence, and provider-selection requirements from the active scope. |
 
-#### Deferred UI / Execution-Bridge Scope
+### Deferred UI / Execution-Bridge Scope
 
 The previous design included a static exploration dashboard/PWA, GitHub Pages hosting, GitHub Actions dispatch, client-side PAT storage, workflow passcodes, execution locks, spend ceilings, and file-based state/history/dossier persistence.
 These are deferred for a future UI and execution-bridge design.
@@ -28,10 +29,10 @@ They are intentionally not requirements of this engine contract; the previous do
 
 ## 1. Overview & Objectives
 
-The **TriO Matrix Engine (TOME)** is a turn-based simulation engine for exploring emergent realisations in complex multi-agent systems where fundamental behavioral dynamics are incomplete, uncertain, or emergent.
+TOME is a turn-based simulation engine for exploring possible outcomes of multi-actor interactions when behavioral rules are incomplete or uncertain.
 It synthesizes the structured argumentation and mechanical probability resolution of **Chris Engle Matrix Games** with the behavioral divergence mechanics of **Cezar Capacle's Triple-O framework**.
 
-**TOME** models multi-actor interactions, friction between actors, and adaptation without relying on conversational consensus, fixed utility equations, or ungrounded claims.
+**TOME** models multi-actor interactions, friction between actors, and adaptation without relying on conversational consensus or fixed utility equations.
 The engine accepts a complete world state and a bounded run request, then returns the final state and an auditable per-turn rationale:
 
 $$\mathcal{M}(\text{WorldState}_{t}, \text{RunRequest}) \longrightarrow (\text{WorldState}_{t+n}, \text{TurnRecord}_{1..n})$$
@@ -62,6 +63,21 @@ $$\mathcal{M}(\text{WorldState}_{t}, \text{RunRequest}) \longrightarrow (\text{W
 * Open-ended conversational chat simulation between actors (all interactions are strictly structured into Proposal, Grounding, and Adjudication phases).
 * Direct in-engine hosting of external narrative vaults (TOME operates as a standalone engine that accepts and returns standardized JSON state and turn records).
 
+### Alternatives Considered
+
+The following comparisons explain the choices retained for Interface Contract 1.1.0.
+Audit representation and publication atomicity are independent decisions: compact audit records could still be published atomically.
+
+| Selected approach | Alternative | Reason for this milestone | Cost or limitation accepted |
+| :--- | :--- | :--- | :--- |
+| Canon-only narrative conditions | Persistent posture, traits, or capability meters | Numeric trackers would impose behavioral rules that this contract does not define; canon leaves their interpretation to the adapters and umpire. | No automatic capability-availability check; historical relevance requires judgment (Section 2.7). |
+| Complete before/after values per changed field | One baseline plus append-only deltas | Each 1.1.0 record can expose the changed field directly without replay or reconstruction. | Canon snapshots grow quadratically across a run; callers must budget accordingly (Section 2.8). Compact records remain a possible versioned alternative. |
+| Run-wide atomic publication | Turn-by-turn result publication | A successful call returns exactly the requested turns, and an ordinary engine error cannot be mistaken for a completed partial run. | Completed callback work is not rolled back; long runs retain all records until completion and return no partial progress (Section 2.8). |
+| A fresh, fixed order per request | Persisted order and next-actor cursor | The run is a self-contained bounded experiment; the closed world-state schema does not store scheduler progress. | Splitting a run into several requests is not equivalent to one longer request. Repeating one-turn requests with the same supplied order repeats its first actor; callers wanting a complete pass request enough turns. |
+
+These choices do not require a UI, execution bridge, provider-specific integration, or persistence layer inside the engine.
+Changing a mandatory result shape, adding scheduler state, or restricting requests to complete rounds requires an explicit interface revision rather than a silent implementation change.
+
 ---
 
 ## 2. Domain Framing & Engine Execution Contract
@@ -79,6 +95,13 @@ A separate umpire-controlled failure resolver must provide a consequence after e
 Because any turn can fail, the proposal generator, peer reviewer, and failure resolver are all required for every run; the engine checks they are present before the first turn.
 These callables are not serialized into `RunRequest`; collecting user input, provider selection, credentials, and transport remain outside this contract.
 Mechanics, validation, turn ordering, state transitions, and result records remain governed by this specification.
+
+The four callables are trusted executable integrations selected by the caller.
+Their world-state snapshots include the supplied canon facts and actor context.
+Snapshots isolate engine working state from mutation; they do not sandbox callback code or prevent it from transmitting data to an external provider.
+Before selecting or invoking an integration, the caller decides which simulation data it may disclose and applies its own provider-access, transmission, retention, and confidentiality controls.
+Excluding credentials from RunRequest is not a promise that executable callbacks cannot access their host environment.
+Untrusted-code isolation, when needed, is a caller responsibility outside this engine contract.
 
 ### 2.1 Per-Turn Posture Die & TriO Tier
 
@@ -116,7 +139,7 @@ The proposal must still ground its supporting arguments in existing `canon_facts
 The engine records the two cues in selection order as `spark_tags`, each formatted `<TableName>:<entry>`, and passes them together with the tier to the proposal generator.
 No table is assigned to a particular tier.
 
-$d66$ uses one-based senary (base-six) notation: two digits, each from 1 to 6, identify one of 36 table entries.
+A d66 lookup rolls two d6 in order and uses the first face as the tens digit and the second as the units digit of a lookup key, giving 36 valid keys.
 
 ### 2.3 Engle Matrix Game Formulation
 
@@ -198,6 +221,48 @@ The consequence enters the run's working `canon_facts` immediately, so the next 
 The completed run result is still published atomically.
 The turn record preserves the source actor when applicable, the original argument through its peer evaluation, the final consequence, and the umpire's rationale.
 
+### 2.7 Historical Canon & Current Relevance
+
+`canon_facts` is an append-only narrative history, in list order, not a mechanically maintained set of currently active capabilities or conditions.
+Later events can change an earlier condition without deleting its original assertion.
+For example, "Actor A has capability X" and the later "Actor A loses capability X" can both remain in canon.
+Citation matching can therefore succeed for a historical fact without establishing that its condition still applies.
+
+Proposal generators and peer reviewers interpret the full supplied history when judging an earlier fact's current relevance.
+The human umpire judges reasoning and narrative suitability when the configured review or required failure-resolution callback is invoked.
+The engine performs the declared text, shape, vote, and novelty checks; it does not infer temporal applicability, invalidate older entries, or apply a "latest statement wins" rule.
+The optional pre-roll review remains optional, so a mechanically valid shift is not guaranteed to have received human relevance review.
+
+Novelty checks still compare a new proposal or failure consequence against the entire canon history using Section 3.0.
+A new occurrence of a condition must be expressed as a distinct event rather than repeating an earlier canon statement.
+
+### 2.8 Workload, Resource Budgets & Failure Limits
+
+This contract targets bounded, human-umpired exploratory runs, not an assurance of arbitrary batch capacity.
+No maximum workload has been benchmarked or guaranteed.
+Positive turn counts and unbounded string fields describe schema acceptance, not resource admission.
+
+For T turns starting with C canon facts, the required complete before/after canon snapshots contain 2CT + T^2 fact occurrences in serialized output.
+With one initial fact, 10,000 turns, and approximately 200 bytes per fact, those occurrences represent about 20 GB of fact text alone, before JSON overhead and the other result fields.
+This is an analytical illustration, not a measured memory or performance result.
+Sharing objects internally cannot remove the duplication from the specified full-value JSON representation.
+
+A completed run with A actors also makes T proposal-generator calls and T * (A - 1) peer-reviewer calls.
+It can require up to T pre-roll umpire reviews and T failure resolutions; the actual counts follow the callback conditions in Section 3.5.
+Provider charges, human decisions, callback snapshots, narrative lengths, and the complete retained result all contribute to the caller's resource budget.
+
+Before calling the engine, the caller chooses and enforces a workload budget for turns, actors, initial canon size, and narrative payloads using its own resources and provider limits.
+The caller also owns adapter-side output limits and timeouts, whose ordinary callback failures use the existing corresponding adapter errors.
+Capacity planning must allow for all result fields and encoding overhead, not only the canon-text calculation above.
+If the budget is insufficient, the caller reduces or declines the workload before invoking the engine.
+These are caller policies, not new RunRequest fields, engine quotas, or stable error codes.
+
+Run-wide atomicity covers engine-owned state and result publication, not external callback effects.
+A failed run does not undo provider calls, spend, or human decisions already made.
+The caller retains its submitted state and decides whether to retry; the engine does not retry or publish partial records.
+Memory exhaustion, interpreter failure, or forced process termination can prevent delivery of either a result or a typed RunFailure.
+No partial result is substituted, and these environmental limits must not be relabelled as the internal-defect-only MechanicsError.
+
 ---
 
 ## 3. State Schema & Data Models
@@ -216,7 +281,7 @@ No other characters, including typographic quotes, are removed, and letter case 
 Two strings *match* when their normalized forms are equal.
 Every narrative-text comparison in this specification normalizes both sides: citation anchors, supporting-pro `source_ref` values, proposal novelty, failure-consequence novelty, and duplicate checks within `canon_facts`.
 Actor IDs are identifiers, not narrative text.
-Normalization applies only to the check that no two actor IDs match.
+Use normalization to check actor IDs for blank values and duplicates.
 Every reference to an actor ID, in `first_round_order`, `voter_actor_id`, `UmpireRejection.voter_actor_id`, or `source_voter_actor_id`, must equal an existing ID exactly, with no normalization.
 
 A *non-whitespace string* is a string whose normalized form is not empty.
@@ -231,7 +296,7 @@ A value of the wrong type or shape is malformed: it raises `InvalidRunRequestErr
 
 All listed fields are required except fields explicitly marked optional elsewhere.
 Object fields reject undeclared properties.
-String fields have no maximum length.
+String fields have no maximum length in the schema; this is not a resource-capacity guarantee (Section 2.8).
 
 ```json
 {
@@ -340,7 +405,9 @@ PeerEvaluation = {
 
 `public_argument` retains the peer's ordinary pro/con reasoning.
 It is the voter's reasoning for its submitted `final_vote`, including any shift.
-It is not rewritten if the shift is reverted; `umpire_rejections` records the reversion, and the umpire judges the argument's fit when resolving a failure.
+It is not rewritten if a shift is reverted mechanically or by the umpire.
+`umpire_rejections` records only human-umpire rejections; mechanically invalid attempted shifts have no separate rejection record.
+The umpire judges the argument's fit when resolving a failure.
 It is a possible source for a failure consequence, not a fact merely because the peer states it.
 The human umpire decides whether it can be used directly, must be restated, or is unsuitable as a failure explanation.
 
@@ -645,7 +712,8 @@ Each entry's `before` and `after` are the complete JSON values of that field.
 
 In Interface Contract 1.1.0 each changed field is explained by exactly one code, so `reason` is always a single `ReasonCode`.
 The narrative explanation of a failure lives in `failure_resolution`, not in `reason`.
-Given the same inputs and umpire decisions, the engine produces the same `reason` text.
+The changed field and resolved outcome determine its `ReasonCode` according to the table above.
+Reproducing the outcome also requires the seed, adapter-output, umpire-decision, and runtime conditions in Invariant 10.
 These values represent the net change at the end of the turn, including counter updates.
 A completed run contains exactly `turn_count` records, including failed attempts; errors use one of the `RunError` types and never include a partial result.
 
@@ -669,11 +737,13 @@ run(
 ) -> RunResult            // or raises a RunError
 ```
 
-The caller owns all four callables, including the LLM-backed proposal generator and peer reviewer.
+The caller owns the supplied callables.
 `proposal_generator`, `peer_reviewer`, and `failure_resolver` are required for every run, because any turn can fail; `umpire_review` is optional.
 A required argument is *missing* when it is `None` or not callable; a missing one raises `InvalidRunRequestError` before any callable is invoked or random number drawn.
 `umpire_review` may be `None`; any other non-callable value also raises `InvalidRunRequestError`.
-Each callable returns a plain mapping or an equivalent model with exactly the declared fields, and the strict value rules of Section 3.0 apply to it.
+`ProposalGenerator`, `PeerReviewer`, and `FailureResolver` return a plain mapping or an equivalent model with exactly the declared fields.
+`UmpireReview` returns a list, including `[]`, whose elements are plain mappings or equivalent models with exactly the `UmpireRejection` fields.
+The strict value rules of Section 3.0 apply to all returned values.
 None of the callables is part of the serialized `RunRequest`; how a UI or bridge gathers the human user's decisions is outside this specification:
 
 ```text
@@ -772,11 +842,6 @@ The generator receives the TriO tier and both selected spark tags together as th
 It must not replace the sampled tables with a tier-specific pair or treat their entries as grounding evidence.
 The active actor and current world state provide narrative context; only `canon_facts` provides grounding references.
 
-An empty or whitespace-only world-change statement is malformed proposal output and raises `ProposalGenerationError` before adjudication; it must never enter canon.
-A statement that matches an existing canon fact raises `InvalidProposalError` before peer review.
-The engine does not request regeneration.
-Statements retain their original text.
-
 ---
 
 ## 4. Invariants & Rules
@@ -799,7 +864,7 @@ Statements retain their original text.
   The proposal proceeds only if at least 1 grounded pro remains; otherwise, the run fails with `InvalidProposalError` and the engine does not regenerate the proposal.
 * **Invariant 6 (Narrative-Only Trackers):** Actor conditions exist only as narrative statements in `canon_facts`.
   They are not consumed, recovered, stepped, or used as automatic numeric modifiers.
-  Grounded peer votes are the only adjustment to the resolution roll.
+  The clamped sum of final peer votes, after mechanical validation and any umpire rejections, is the only numeric modifier to the resolution roll.
 * **Invariant 7 (Binary Resolution):** An adjusted total of 7 or more is Success; a lower total is Failure.
   Success appends the proposal's world-change statement to canon.
   Because proposals are validated as new before peer review, Success always adds a new fact.
@@ -816,6 +881,7 @@ Statements retain their original text.
 * **Invariant 11 (State and Result Atomicity):** The submitted `WorldState` is never mutated.
   The engine returns a final state and exactly `turn_count` records only after all requested turns complete.
   An engine error, including an invalid failure resolution, returns no partial state.
+  This atomicity guarantee does not roll back external callback effects; resource-delivery limits are defined in Section 2.8.
 * **Invariant 12 (Time and Round Counters):** `turn_index` increments once after each resolved turn.
   Within a request, `session_index` increments once after every complete pass through that request's order; it does not increment for an incomplete final pass.
   A new request starts a new order rather than resuming an incomplete pass.
@@ -871,20 +937,20 @@ The caller passes the request and the required `proposal_generator`, `peer_revie
    Create one `random.Random` instance from the non-negative `seed`, or system entropy when omitted.
    Select the first-round order from the supplied permutation, or shuffle the actor IDs, taken in `WorldState.actors` order, with that instance.
 3. Execute exactly `turn_count` turns, advancing through the order and restarting at its first actor after each complete pass:
-   a. Roll the posture die and map the result to its TriO tier.
+   1. Roll the posture die and map the result to its TriO tier.
       Independently sample two distinct tables, roll one d66 entry from each, and construct their spark tags in selection order.
-   b. Generate a `ProposalDraft` through the caller-supplied `proposal_generator`; the engine attaches the already-resolved active actor ID, posture roll, TriO tier, and spark tags to form the `Proposal`.
-   c. Check the proposal-generator output in the order defined in Section 3.5: shape, then novelty against `canon_facts`, then pruning of ungrounded pros.
+   2. Generate a `ProposalDraft` through the caller-supplied `proposal_generator`; the engine attaches the already-resolved active actor ID, posture roll, TriO tier, and spark tags to form the `Proposal`.
+   3. Check the proposal-generator output in the order defined in Section 3.5: shape, then novelty against `canon_facts`, then pruning of ungrounded pros.
       Validate and prune proposal pros against `canon_facts` only; if none remain, fail with `InvalidProposalError`.
-   d. Obtain one peer evaluation from every non-active actor, then apply shift and canon-fact grounding validation without consuming any fact.
-   e. If an umpire callback is configured and any shifted votes remain, obtain its rejections and validate them.
+   4. Obtain one peer evaluation from every non-active actor, then apply shift and canon-fact grounding validation without consuming any fact.
+   5. If an umpire callback is configured and any shifted votes remain, obtain its rejections and validate them.
       Preserve each rejected evaluation and the user's reason, then revert only those shifts to baseline.
       Without a callback or without rejections, mechanically valid votes proceed.
-   f. Sum the post-review final votes, clamp to $[-3, +3]$, roll 2d6, and add the modifier.
-   g. If the adjusted total is at least 7, record Success and append the proposal statement to canon.
-   h. Otherwise record Failure, derive the lowest-final-vote candidate set, and obtain a validated `FailureResolution` from the human-umpire-controlled callback.
+   6. Sum the post-review final votes, clamp to $[-3, +3]$, roll 2d6, and add the modifier.
+   7. If the adjusted total is at least 7, record Success and append the proposal statement to canon.
+   8. Otherwise record Failure, derive the lowest-final-vote candidate set, and obtain a validated `FailureResolution` from the human-umpire-controlled callback.
       Append exactly that new consequence to canon, not the rejected proposal or any additional automatic facts or boons.
-   i. Increment `turn_index`.
+   9. Increment `turn_index`.
       If every actor in the fixed run order has acted, increment `session_index`.
       Record the proposal, final evaluations, umpire rejections, roll, modifier, outcome, nullable failure resolution, and end-of-turn state delta in a `TurnRecord`.
 4. Return `RunResult` with the final state and ordered records.
@@ -894,11 +960,12 @@ The caller passes the request and the required `proposal_generator`, `peer_revie
 The engine works on an isolated copy of the input state.
 If validation, proposal generation, peer review, umpire review, failure resolution, or mechanics fail, it raises an explicit error.
 It publishes no partial result, and the caller retains its original state unchanged.
+Section 2.8 defines the environmental limits of error delivery; they do not authorize a partial result or an engine-level retry.
 
 ### Outputs & Events
 
 The successful output is the versioned `RunResult` in Section 3.4.
-The engine does not write files, append history, create a dossier, or emit transport-specific progress events.
+The engine does not write files, append to an external history store, create a dossier, or emit transport-specific progress events.
 A caller may persist the returned state and turn records as it chooses.
 
 ---
@@ -978,6 +1045,10 @@ A caller may persist the returned state and turn records as it chooses.
 * **Grounding Gate Verification:** Assert only canon facts ground supporting arguments and shifted votes.
   Nonexistent strings, actor metadata, and spark entries do not qualify unless independently present in `canon_facts`.
   Assert the same canon fact can be reused on later turns without mutation.
+* **Historical Canon Grounding:** With both "Actor A has capability X" and the later "Actor A loses capability X" in canon, assert that the earlier text remains mechanically valid as a citation and neither entry is removed or invalidated automatically.
+  A configured umpire review may reject the resulting shift through the existing rejection rules; without that callback, a mechanically valid shift remains.
+  Assert that proposal and failure-consequence novelty checks still cover the entire history.
+  These assertions verify the mechanical boundary, not the quality of adapter or human interpretation.
 * **Umpire Rejection:** Assert a human rejection reverts a correctly cited upward or downward shift to its exact baseline, sets the flag false and anchor null, and leaves baseline/public argument unchanged.
   Verify rejected votes are reverted before summation and clamping, while other votes are unchanged.
 * **Optional Pre-Roll Callback:** Assert absence of `UmpireReview` adds no vote-approval requirement; no remaining shifts skips that callback.
@@ -1039,14 +1110,31 @@ A caller may persist the returned state and turn records as it chooses.
 
 ## 8. Goldfish Review Gates
 
+### Historical Approvals
+
 The [Goldfish review report](../reviews/001_tome_core_architecture_review.md) records the historical 1.0.0 approval and four zero-context passes on Spec Version 1.1.0, all on 2026-11-11.
 The first review returned `Revisions Required` with six blocking items on normalization, canon-fact validation, error classification, `reason` text, shuffle input order, and the runner entry point.
 The confirmation pass found those six resolved and raised two new blocking items: exact actor-ID references (NEW-01) and the stored form of `cited_anchor` (NEW-02).
 The sign-off check found NEW-01 resolved and one remaining edge of NEW-02: the state of the pre-reversion evaluation (NEW-09).
 The approval check found NEW-09 and NEW-10 resolved, with no new contradictions, and returned `Verdict: Approved`.
-Three non-blocking suggestions remain deferred: returning the effective seed in `RunResult`, pinning a content digest for `trio-d66-v1`, and noting the growth of `before`/`after` snapshots over long runs.
+At that approval, three non-blocking suggestions were deferred: returning the effective seed in `RunResult`, pinning a content digest for `trio-d66-v1`, and documenting snapshot growth over long runs.
 The human developer signed off the review revisions on 2026-11-11.
 
-- [x] Zero-context Goldfish review completed for the current Spec Version 1.1.0 draft
+- [x] Zero-context Goldfish review completed for Spec Version 1.1.0
 - [x] Goldfish confirmation of corrected contract gaps for Spec Version 1.1.0
-- [x] Human developer approval signed off
+- [x] Human developer approval of Spec Version 1.1.0 signed off on 2026-11-11
+
+### Current Approved Specification: Spec Version 1.1.2
+
+The [official-workflow review of Spec Version 1.1.1](../reviews/001_tome_core_architecture_egm/consolidated_review_report.md) completed on 2026-11-13 with `Verdict: Revisions Required`.
+The [annotated resolution report](../reviews/001_tome_core_architecture_egm/goldfish_review_report.md) records the dispositions and approved documentation changes for this revision.
+Section 2.8 now documents snapshot growth and caller-owned mitigation; a compact result schema remains a separate versioned alternative.
+Effective-seed output and table-digest pinning remain deferred suggestions.
+Interface Contract 1.1.0 is unchanged.
+The [review loop](../reviews/001_tome_core_architecture_egm/review_loop/review_loop_report.md) reached two consecutive clean rounds on 2026-11-14 after three rounds; the round-three editorial repairs are recorded in its report.
+The human developer signed off Spec Version 1.1.2 on 2026-11-17.
+Mechanical contract validation is a separate structural gate and does not replace those approvals.
+
+- [x] Human-approved resolution edits applied to the specification
+- [x] Fresh Goldfish confirmation of Spec Version 1.1.2
+- [x] Human developer sign-off on Spec Version 1.1.2 recorded on 2026-11-17

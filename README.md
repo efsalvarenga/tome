@@ -11,8 +11,8 @@ It is scenario-agnostic: the caller supplies the actors, the established facts, 
 
 $$\mathcal{M}(\text{WorldState}_{t}, \text{RunRequest}) \longrightarrow (\text{WorldState}_{t+n}, \text{TurnRecord}_{1..n})$$
 
-> **Status:** The [core architecture specification](docs/designs/001_tome_core_architecture.md) (Spec 1.1.1, Interface Contract 1.1.0) is approved.
-> The code in `src/tome/` still implements an earlier design and is being rewritten to match it.
+> **Status:** The [core architecture specification](docs/designs/001_tome_core_architecture.md) (Spec 1.1.2, Interface Contract 1.1.0) is approved, with human sign-off recorded on 2026-11-17.
+> The code in `src/tome/` still implements an earlier design and does not yet conform to the approved specification.
 
 ---
 
@@ -91,7 +91,7 @@ tome/
 │   └── reviews/            # Zero-context Goldfish reviews
 │       └── 001_tome_core_architecture_review.md
 ├── src/
-│   └── tome/               # Simulation engine (being rewritten to Spec 1.1.1)
+│   └── tome/               # Simulation engine (legacy implementation; Spec 1.1.2 approved)
 │       ├── __init__.py     # Package entry point and version
 │       ├── dice.py         # Dice mechanics
 │       ├── models.py       # Pydantic v2 schemas
