@@ -28,6 +28,11 @@ This document specifies repository calibration, architectural invariants, and ag
   * Specifications live in `docs/designs/<NNN>_<feature_slug>.md` using the EGM design template.
   * Zero-context adversarial critiques live in `docs/reviews/<NNN>_<feature_slug>_review.md`.
   * Specifications must pass `validate_egm.py` before core production implementation commences.
+  * Implementation plans live in `docs/plans/<NNN>_<feature_slug>_plan.md`.
+    A plan implements an approved specification without restating it.
+    Plans stay out of `docs/designs/`, because `validate_egm.py` treats every file there as a specification.
+  * EGM workflow records, including implementation-readiness reviews of plans, live under `docs/reviews/<NNN>_<feature_slug>_egm/`.
+    Do not add other top-level `docs/reviews/<NNN>_*.md` files, because `validate_egm.py` reads the first top-level match as the specification's review.
 * **Strict No-Code Rule during Elephant Drafting:** Design specifications focus on contracts, state schemas, invariants, and edge cases before code is written.
 * **One Sentence per Line:** In Markdown prose, write each sentence on its own source line for cleaner diffs; code blocks, tables, and headings are exempt.
 
