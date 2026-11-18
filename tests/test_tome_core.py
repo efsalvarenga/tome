@@ -956,14 +956,14 @@ def test_run_accepts_mapping_and_model():
     assert results[0] == results[1] == results[2]
 
 
-@pytest.mark.parametrize("request", ['{"contract_version": "1.1.0"}', [], None])
-def test_run_rejects_non_mapping_request(request, monkeypatch):
+@pytest.mark.parametrize("value", ['{"contract_version": "1.1.0"}', [], None])
+def test_run_rejects_non_mapping_request(value, monkeypatch):
     callbacks = ScriptedCallbacks()
     rng_calls = []
     monkeypatch.setattr(runner.random, "Random", lambda *args: rng_calls.append(args))
     with pytest.raises(errors.InvalidRunRequestError):
         runner.run(
-            request,
+            value,
             callbacks.proposal_generator,
             callbacks.peer_reviewer,
             callbacks.failure_resolver,
