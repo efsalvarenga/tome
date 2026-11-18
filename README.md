@@ -99,7 +99,7 @@ tome/
 │       ├── tables.py       # Default d66 spark tables (Triple-O template)
 │       └── validator.py    # Grounding and adjudication rules
 ├── tests/
-│   └── test_tome_core.py   # Deterministic test suite
+│   └── test_legacy_engine.py  # Legacy tests, to be removed
 ├── AGENTS.md               # Repository conventions for agents
 ├── pyproject.toml          # Project metadata, dependencies, and tooling
 └── LICENSE                 # Dual MIT and CC BY-SA 4.0 licences
@@ -112,7 +112,7 @@ tome/
 ### Prerequisites
 
 * Python 3.11 or later
-* [`uv`](https://docs.astral.sh/uv/) (recommended) or standard `pip`
+* [`uv`](https://docs.astral.sh/uv/) is required for the verification gate
 
 ### Setup
 
@@ -120,26 +120,19 @@ tome/
 git clone https://github.com/efsalvarenga/tome.git
 cd tome
 
-# Create and activate a virtual environment with uv
-uv venv
-source .venv/bin/activate
-
 # Install the package in editable mode with development dependencies
-uv pip install -e ".[dev]"
+uv sync --locked --extra dev
 ```
 
-### Running the Test Suite
+### Verification
+
+The verification gate runs Ruff lint, the Ruff format check, and pytest using the committed lockfile.
 
 ```bash
-pytest
+./scripts/lint.sh
 ```
 
-### Formatting & Static Analysis
-
-```bash
-ruff check .
-ruff format --check .
-```
+Users of `pip` can still install with `pip install -e ".[dev]"` and run `ruff check .`, `ruff format --check .`, and `pytest` directly.
 
 ---
 

@@ -40,6 +40,9 @@ This document specifies repository calibration, architectural invariants, and ag
 
 * **Language & Runtime:** Python 3.11+
 * **Package & Environment Management:** `uv` (`pyproject.toml`)
+* **Verification:** `./scripts/lint.sh` is the green-baseline gate.
+  Commit `uv.lock` and refresh it with `uv lock` when dependencies change.
+  `.python-version` pins Python 3.11 for the golden vectors.
 * **Core Libraries:**
   * `pydantic` (v2) for strict runtime schema validation and serialization.
   * `pytest` for deterministic mechanical test suites.
