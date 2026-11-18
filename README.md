@@ -11,8 +11,8 @@ It is scenario-agnostic: the caller supplies the actors, the established facts, 
 
 $$\mathcal{M}(\text{WorldState}_{t}, \text{RunRequest}) \longrightarrow (\text{WorldState}_{t+n}, \text{TurnRecord}_{1..n})$$
 
-> **Status:** The [core architecture specification](docs/designs/001_tome_core_architecture.md) (Spec 1.1.2, Interface Contract 1.1.0) is approved, with human sign-off recorded on 2026-11-17.
-> The code in `src/tome/` still implements an earlier design and does not yet conform to the approved specification.
+> **Status:** `src/tome/` implements Spec 1.1.2 (Interface Contract 1.1.0).
+> It is checked by tests derived from Section 7 of the [specification](docs/designs/001_tome_core_architecture.md).
 
 ---
 
@@ -88,18 +88,32 @@ tome/
 ├── docs/
 │   ├── designs/            # EGM design specifications
 │   │   └── 001_tome_core_architecture.md
+│   ├── plans/              # Approved implementation plans
+│   │   └── 001_tome_core_architecture_plan.md
 │   └── reviews/            # Zero-context Goldfish reviews
-│       └── 001_tome_core_architecture_review.md
+│       ├── 001_tome_core_architecture_review.md
+│       └── 001_tome_core_architecture_egm/  # EGM workflow records
+├── scripts/
+│   └── lint.sh             # Locked verification gate
 ├── src/
-│   └── tome/               # Simulation engine (legacy implementation; Spec 1.1.2 approved)
-│       ├── __init__.py     # Package entry point and version
-│       ├── dice.py         # Dice mechanics
-│       ├── models.py       # Pydantic v2 schemas
-│       ├── runner.py       # Turn orchestration
+│   └── tome/               # Simulation engine (Spec 1.1.2)
+│       ├── __init__.py     # Package entry point, version, and public API
 │       ├── tables.py       # Default d66 spark tables (Triple-O template)
-│       └── validator.py    # Grounding and adjudication rules
+│       └── engine/
+│           ├── __init__.py # Public engine API
+│           ├── errors.py   # Stable failure types
+│           ├── text.py     # Narrative text matching
+│           ├── models.py   # Strict Pydantic v2 contract models
+│           ├── mechanics.py  # Seeded dice and spark draws
+│           ├── gates.py    # Grounding and callback validation
+│           ├── protocols.py  # Caller-supplied callback contracts
+│           └── runner.py   # Atomic turn orchestration
 ├── tests/
-│   └── test_legacy_engine.py  # Legacy tests, to be removed
+│   ├── support.py          # Shared deterministic test helpers
+│   ├── test_tome_core.py   # Contract and mechanics unit tests
+│   └── test_tome_integration.py  # End-to-end contract tests
+├── .python-version         # Python 3.11 interpreter pin
+├── uv.lock                 # Locked runtime and development dependencies
 ├── AGENTS.md               # Repository conventions for agents
 ├── pyproject.toml          # Project metadata, dependencies, and tooling
 └── LICENSE                 # Dual MIT and CC BY-SA 4.0 licences
