@@ -1,3 +1,6 @@
+import random
+
+
 def make_world(actor_ids=("actor_a", "actor_b"), canon=("Fact 1.",), session_index=0, turn_index=0):
     return {
         "session_index": session_index,
@@ -60,3 +63,89 @@ INVALID_REQUEST_CASES = [
     ("inexact-order-actor", lambda r: r.update(first_round_order=["actor_a ", "actor_b"])),
     ("tuple-order", lambda r: r.update(first_round_order=("actor_a", "actor_b"))),
 ]
+
+
+class ScriptedCallbacks:
+    def __init__(self, proposal=None, peer=None, umpire=None, failure=None):
+        self.proposal = proposal
+        self.peer = peer
+        self.umpire = umpire
+        self.failure = failure
+        self.proposal_calls = []
+        self.peer_calls = []
+        self.umpire_calls = []
+        self.failure_calls = []
+
+    def proposal_generator(self, active_actor, trio_tier, spark_tags, world_state, /):
+        args = (active_actor, trio_tier, spark_tags, world_state)
+        self.proposal_calls.append(args)
+        if self.proposal is not None:
+            return self.proposal(*args)
+        return {
+            "world_change_statement": f"{active_actor.name} achieves outcome {world_state.turn_index + 1}.",
+            "supporting_pros": [
+                {
+                    "source_type": "canon_fact",
+                    "source_ref": world_state.canon_facts[0],
+                    "argument": "Scripted supporting argument.",
+                }
+            ],
+        }
+
+    def peer_reviewer(self, voter_actor, proposal, world_state, /):
+        args = (voter_actor, proposal, world_state)
+        self.peer_calls.append(args)
+        if self.peer is not None:
+            return self.peer(*args)
+        return {
+            "voter_actor_id": voter_actor.id,
+            "baseline_plausibility": 0,
+            "final_vote": 0,
+            "biased_shift_applied": False,
+            "cited_anchor": None,
+            "public_argument": f"{voter_actor.name} is uncertain.",
+        }
+
+    def umpire_review(self, turn_index, proposal, peer_evaluations, world_state, /):
+        args = (turn_index, proposal, peer_evaluations, world_state)
+        self.umpire_calls.append(args)
+        return [] if self.umpire is None else self.umpire(*args)
+
+    def failure_resolver(
+        self,
+        turn_index,
+        proposal,
+        peer_evaluations,
+        candidate_voter_ids,
+        adjusted_total,
+        world_state,
+        /,
+    ):
+        args = (
+            turn_index,
+            proposal,
+            peer_evaluations,
+            candidate_voter_ids,
+            adjusted_total,
+            world_state,
+        )
+        self.failure_calls.append(args)
+        if self.failure is not None:
+            return self.failure(*args)
+        return {
+            "source_voter_actor_id": candidate_voter_ids[0] if candidate_voter_ids else None,
+            "world_change_statement": f"Consequence {turn_index}.",
+            "rationale": "Scripted test decision.",
+        }
+
+
+def seed_for_base_roll(target: int) -> int:
+    for seed in range(10_000):
+        rng = random.Random(seed)
+        rng.randint(1, 6)
+        rng.sample(["Action", "Focus", "Method", "Disposition", "Motivation"], 2)
+        for _ in range(4):
+            rng.randint(1, 6)
+        if rng.randint(1, 6) + rng.randint(1, 6) == target:
+            return seed
+    raise AssertionError(f"No seed produces base roll {target}.")

@@ -1,3 +1,6 @@
+import asyncio
+import concurrent.futures
+import inspect
 import random
 from collections.abc import Mapping
 from copy import deepcopy
@@ -6,10 +9,18 @@ from types import MappingProxyType
 
 import pytest
 from pydantic import ValidationError
-from support import INVALID_REQUEST_CASES, make_request, make_world, override_tables
+from support import (
+    INVALID_REQUEST_CASES,
+    ScriptedCallbacks,
+    make_request,
+    make_world,
+    override_tables,
+    seed_for_base_roll,
+)
 
+import tome
 from tome import tables as built_in_tables
-from tome.engine import errors, gates, mechanics, models, text
+from tome.engine import errors, gates, mechanics, models, protocols, runner, text
 
 
 def test_normalization_vectors():
@@ -862,3 +873,939 @@ def test_callback_output_conversion_exception_boundaries(exception, kind):
         assert caught.value.__cause__ is original
     else:
         assert caught.value is original
+
+
+def test_required_callables_checked_first(monkeypatch):
+    callbacks = ScriptedCallbacks()
+    rng_calls = []
+    real_random = random.Random
+
+    def spy(*args, **kwargs):
+        rng_calls.append((args, kwargs))
+        return real_random(*args, **kwargs)
+
+    monkeypatch.setattr(runner.random, "Random", spy)
+    valid = {
+        "proposal_generator": callbacks.proposal_generator,
+        "peer_reviewer": callbacks.peer_reviewer,
+        "failure_resolver": callbacks.failure_resolver,
+        "umpire_review": None,
+    }
+    for name in valid:
+        for bad in [None, "x"]:
+            if name == "umpire_review" and bad is None:
+                continue
+            with pytest.raises(errors.InvalidRunRequestError):
+                runner.run(make_request(), **{**valid, name: bad})
+            assert not rng_calls
+            assert not any(
+                [
+                    callbacks.proposal_calls,
+                    callbacks.peer_calls,
+                    callbacks.failure_calls,
+                    callbacks.umpire_calls,
+                ]
+            )
+    runner.run(make_request(seed=20), **valid)
+    assert len(rng_calls) == 1
+
+
+@pytest.mark.parametrize(
+    "case_id,mutator", INVALID_REQUEST_CASES, ids=lambda x: x if isinstance(x, str) else None
+)
+def test_run_rejects_invalid_request_before_callbacks(case_id, mutator, monkeypatch):
+    request = make_request()
+    mutator(request)
+    before = deepcopy(request)
+    callbacks = ScriptedCallbacks()
+    rng_calls = []
+    monkeypatch.setattr(runner.random, "Random", lambda *args: rng_calls.append(args))
+    with pytest.raises(errors.InvalidRunRequestError) as caught:
+        runner.run(
+            request,
+            callbacks.proposal_generator,
+            callbacks.peer_reviewer,
+            callbacks.failure_resolver,
+        )
+    assert request == before
+    assert not rng_calls
+    assert not any(
+        [
+            callbacks.proposal_calls,
+            callbacks.peer_calls,
+            callbacks.umpire_calls,
+            callbacks.failure_calls,
+        ]
+    )
+    assert not hasattr(caught.value, "partial_result")
+
+
+def test_run_accepts_mapping_and_model():
+    request = make_request(seed=20, first_round_order=["actor_a", "actor_b"])
+    results = []
+    for value in [request, MappingProxyType(request), models.RunRequest.model_validate(request)]:
+        callbacks = ScriptedCallbacks()
+        results.append(
+            runner.run(
+                value,
+                callbacks.proposal_generator,
+                callbacks.peer_reviewer,
+                callbacks.failure_resolver,
+            ).model_dump(mode="json")
+        )
+    assert results[0] == results[1] == results[2]
+
+
+@pytest.mark.parametrize("request", ['{"contract_version": "1.1.0"}', [], None])
+def test_run_rejects_non_mapping_request(request, monkeypatch):
+    callbacks = ScriptedCallbacks()
+    rng_calls = []
+    monkeypatch.setattr(runner.random, "Random", lambda *args: rng_calls.append(args))
+    with pytest.raises(errors.InvalidRunRequestError):
+        runner.run(
+            request,
+            callbacks.proposal_generator,
+            callbacks.peer_reviewer,
+            callbacks.failure_resolver,
+        )
+    assert not callbacks.proposal_calls and not callbacks.peer_calls and not callbacks.failure_calls
+    assert not rng_calls
+
+
+def test_spark_table_source_and_tags():
+    results = []
+    for optional in [{}, {"spark_tables": override_tables()}]:
+        callbacks = ScriptedCallbacks()
+        results.append(
+            runner.run(
+                make_request(seed=20, first_round_order=["actor_a", "actor_b"], **optional),
+                callbacks.proposal_generator,
+                callbacks.peer_reviewer,
+                callbacks.failure_resolver,
+            )
+        )
+    default, override = results
+    assert default.spark_table_source == "trio-d66-v1"
+    assert override.spark_table_source == "request"
+    a, b = default.turn_records[0], override.turn_records[0]
+    assert a.proposal.spark_tags == [
+        f"Focus:{built_in_tables.TABLE_FOCUS[66]}",
+        f"Method:{built_in_tables.TABLE_METHOD[13]}",
+    ]
+    assert b.proposal.spark_tags == ["Focus:Focus 66", "Method:Method 13"]
+    assert a.proposal.posture_roll == b.proposal.posture_roll == 6
+    assert [tag.split(":")[0] for tag in a.proposal.spark_tags] == [
+        tag.split(":")[0] for tag in b.proposal.spark_tags
+    ]
+    assert a.resolution_roll == b.resolution_roll == 7
+
+
+def test_generator_receives_tier_and_both_tags():
+    callbacks = ScriptedCallbacks()
+    result = runner.run(
+        make_request(seed=20),
+        callbacks.proposal_generator,
+        callbacks.peer_reviewer,
+        callbacks.failure_resolver,
+    )
+    actor, tier, tags, state = callbacks.proposal_calls[0]
+    proposal = result.turn_records[0].proposal
+    assert actor.id == proposal.active_actor_id
+    assert tier == proposal.trio_tier
+    assert tags == proposal.spark_tags and len(tags) == 2
+    assert state == models.WorldState.model_validate(make_world())
+
+
+def test_one_ordered_evaluation_per_peer():
+    callbacks = ScriptedCallbacks()
+    result = runner.run(
+        make_request(
+            world=make_world(("actor_c", "actor_a", "actor_b")),
+            seed=20,
+            first_round_order=["actor_a", "actor_b", "actor_c"],
+        ),
+        callbacks.proposal_generator,
+        callbacks.peer_reviewer,
+        callbacks.failure_resolver,
+    )
+    assert [call[0].id for call in callbacks.peer_calls] == ["actor_c", "actor_b"]
+    assert [e.voter_actor_id for e in result.turn_records[0].peer_evaluations] == [
+        "actor_c",
+        "actor_b",
+    ]
+    assert all(call[1] == result.turn_records[0].proposal for call in callbacks.peer_calls)
+
+
+def test_new_proposal_rejected_before_peers_and_dice(monkeypatch):
+    callbacks = ScriptedCallbacks(
+        proposal=lambda *args: {
+            "world_change_statement": ' "Fact 1." ',
+            "supporting_pros": [
+                {"source_type": "canon_fact", "source_ref": "Fact 1.", "argument": ""}
+            ],
+        }
+    )
+    dice_calls = []
+    monkeypatch.setattr(runner, "roll_resolution", lambda rng: dice_calls.append(rng))
+    request = make_request(seed=20)
+    before = deepcopy(request)
+    with pytest.raises(errors.InvalidProposalError):
+        runner.run(
+            request,
+            callbacks.proposal_generator,
+            callbacks.peer_reviewer,
+            callbacks.failure_resolver,
+        )
+    assert len(callbacks.proposal_calls) == 1
+    assert not callbacks.peer_calls and not callbacks.failure_calls and not dice_calls
+    assert request == before
+
+
+@pytest.mark.parametrize("mode", ["absent", "no-shift", "invalid-shift", "empty", "reject"])
+def test_umpire_review_invocation_rules(mode):
+    def peer(actor, proposal, state):
+        return {
+            "voter_actor_id": actor.id,
+            "baseline_plausibility": 0,
+            "final_vote": 0 if mode == "no-shift" else 1,
+            "biased_shift_applied": False,
+            "cited_anchor": None if mode == "invalid-shift" else "Fact 1.",
+            "public_argument": "",
+        }
+
+    def umpire(turn, proposal, evaluations, state):
+        return (
+            [{"voter_actor_id": evaluations[0].voter_actor_id, "reason": "Illogical."}]
+            if mode == "reject"
+            else []
+        )
+
+    callbacks = ScriptedCallbacks(peer=peer, umpire=umpire)
+    result = runner.run(
+        make_request(world=make_world(("actor_a", "actor_b", "actor_c")), turn_count=3, seed=20),
+        callbacks.proposal_generator,
+        callbacks.peer_reviewer,
+        callbacks.failure_resolver,
+        None if mode == "absent" else callbacks.umpire_review,
+    )
+    eligible = mode in {"empty", "reject"}
+    assert len(callbacks.umpire_calls) == (3 if eligible else 0)
+    if eligible:
+        assert [call[0] for call in callbacks.umpire_calls] == [1, 2, 3]
+        assert all(len(call[2]) == 2 for call in callbacks.umpire_calls)
+        assert all(all(e.biased_shift_applied for e in call[2]) for call in callbacks.umpire_calls)
+    expected_modifier = 0 if mode in {"no-shift", "invalid-shift"} else 1 if mode == "reject" else 2
+    assert all(record.net_vote_modifier == expected_modifier for record in result.turn_records)
+    assert all(
+        len(record.umpire_rejections) == (1 if mode == "reject" else 0)
+        for record in result.turn_records
+    )
+
+
+def test_umpire_error_aborts_without_result():
+    callbacks = ScriptedCallbacks(
+        peer=lambda actor, proposal, state: {
+            "voter_actor_id": actor.id,
+            "baseline_plausibility": 0,
+            "final_vote": 1,
+            "biased_shift_applied": True,
+            "cited_anchor": "Fact 1.",
+            "public_argument": "",
+        },
+        umpire=lambda *args: None,
+    )
+    request = make_request(seed=20)
+    before = deepcopy(request)
+    with pytest.raises(errors.UmpireReviewError) as caught:
+        runner.run(
+            request,
+            callbacks.proposal_generator,
+            callbacks.peer_reviewer,
+            callbacks.failure_resolver,
+            callbacks.umpire_review,
+        )
+    assert request == before
+    assert not callbacks.failure_calls and not hasattr(caught.value, "partial_result")
+
+
+def test_umpire_review_receives_validated_evaluation():
+    callbacks = ScriptedCallbacks(
+        peer=lambda actor, proposal, state: {
+            "voter_actor_id": actor.id,
+            "baseline_plausibility": 1,
+            "final_vote": 0,
+            "biased_shift_applied": False,
+            "cited_anchor": '  "Fact 1."  ',
+            "public_argument": "Original.",
+        },
+        umpire=lambda *args: [{"voter_actor_id": "actor_b", "reason": "Illogical."}],
+    )
+    result = runner.run(
+        make_request(seed=20, first_round_order=["actor_a", "actor_b"]),
+        callbacks.proposal_generator,
+        callbacks.peer_reviewer,
+        callbacks.failure_resolver,
+        callbacks.umpire_review,
+    )
+    before = callbacks.umpire_calls[0][2][0]
+    assert before.biased_shift_applied is True and before.cited_anchor == "Fact 1."
+    assert before == result.turn_records[0].umpire_rejections[0].evaluation_before_reversion
+    assert result.turn_records[0].peer_evaluations[0].final_vote == 1
+
+
+def test_success_appends_proposal():
+    callbacks = ScriptedCallbacks()
+    result = runner.run(
+        make_request(seed=seed_for_base_roll(7), first_round_order=["actor_a", "actor_b"]),
+        callbacks.proposal_generator,
+        callbacks.peer_reviewer,
+        callbacks.failure_resolver,
+    )
+    record = result.turn_records[0]
+    assert (record.resolution_roll, record.adjusted_total, record.outcome) == (7, 7, "Success")
+    assert result.final_world_state.canon_facts == [
+        "Fact 1.",
+        record.proposal.world_change_statement,
+    ]
+    assert record.failure_resolution is None and not callbacks.failure_calls
+
+
+def test_failure_appends_consequence():
+    callbacks = ScriptedCallbacks()
+    result = runner.run(
+        make_request(seed=seed_for_base_roll(6), first_round_order=["actor_a", "actor_b"]),
+        callbacks.proposal_generator,
+        callbacks.peer_reviewer,
+        callbacks.failure_resolver,
+    )
+    record = result.turn_records[0]
+    assert (record.resolution_roll, record.adjusted_total, record.outcome) == (6, 6, "Failure")
+    assert result.final_world_state.canon_facts == ["Fact 1.", "Consequence 1."]
+    assert record.proposal.world_change_statement not in result.final_world_state.canon_facts
+    assert record.failure_resolution.world_change_statement == "Consequence 1."
+    assert record.turn_index == 1 and len(callbacks.failure_calls) == 1
+
+
+def test_every_turn_adds_exactly_one_fact(monkeypatch):
+    dice = iter([(4, 4), (1, 1)] * 5)
+    monkeypatch.setattr(runner, "roll_resolution", lambda rng: next(dice))
+    callbacks = ScriptedCallbacks()
+    result = runner.run(
+        make_request(turn_count=10, seed=20),
+        callbacks.proposal_generator,
+        callbacks.peer_reviewer,
+        callbacks.failure_resolver,
+    )
+    assert {record.outcome for record in result.turn_records} == {"Success", "Failure"}
+    for i, record in enumerate(result.turn_records):
+        change = record.state_changes[0]
+        assert len(change.before) == i + 1 and len(change.after) == i + 2
+        assert change.after[:-1] == change.before
+    assert len(result.final_world_state.canon_facts) == 11
+
+
+@pytest.mark.parametrize("case", ["unique", "tied", "rejection"])
+def test_failure_resolver_called_on_every_failure(case):
+    def peer(actor, proposal, state):
+        baseline = (
+            -1
+            if case == "unique" and actor.id == "actor_b"
+            else 1
+            if case == "rejection" and actor.id == "actor_b"
+            else 0
+        )
+        return {
+            "voter_actor_id": actor.id,
+            "baseline_plausibility": baseline,
+            "final_vote": 0 if case == "rejection" else baseline,
+            "biased_shift_applied": False,
+            "cited_anchor": "Fact 1.",
+            "public_argument": f"Original argument from {actor.id}.",
+        }
+
+    callbacks = ScriptedCallbacks(
+        peer=peer,
+        umpire=lambda *args: [{"voter_actor_id": "actor_b", "reason": "Illogical."}],
+        failure=lambda turn, proposal, evaluations, candidates, total, state: {
+            "source_voter_actor_id": candidates[-1],
+            "world_change_statement": "Restated consequence.",
+            "rationale": "Umpire choice.",
+        },
+    )
+    result = runner.run(
+        make_request(
+            world=make_world(("actor_a", "actor_b", "actor_c")),
+            seed=seed_for_base_roll(2),
+            first_round_order=["actor_a", "actor_b", "actor_c"],
+        ),
+        callbacks.proposal_generator,
+        callbacks.peer_reviewer,
+        callbacks.failure_resolver,
+        callbacks.umpire_review if case == "rejection" else None,
+    )
+    expected = (
+        ["actor_b"]
+        if case == "unique"
+        else ["actor_b", "actor_c"]
+        if case == "tied"
+        else ["actor_c"]
+    )
+    assert len(callbacks.failure_calls) == 1
+    turn, proposal, evaluations, candidates, total, state = callbacks.failure_calls[0]
+    record = result.turn_records[0]
+    assert proposal == record.proposal
+    assert turn == 1 and candidates == expected
+    assert total == record.adjusted_total == 2 + sum(e.final_vote for e in evaluations)
+    assert state.turn_index == 0 and state.canon_facts == ["Fact 1."]
+    assert record.failure_resolution.source_voter_actor_id == expected[-1]
+    assert all(
+        e.public_argument == f"Original argument from {e.voter_actor_id}."
+        for e in record.peer_evaluations
+    )
+    assert result.final_world_state.canon_facts == ["Fact 1.", "Restated consequence."]
+
+
+@pytest.mark.parametrize("source", [None, "actor_a"])
+def test_one_actor_failure_requires_null_source(source):
+    callbacks = ScriptedCallbacks(
+        failure=lambda *args: {
+            "source_voter_actor_id": source,
+            "world_change_statement": "Consequence.",
+            "rationale": "No peers.",
+        }
+    )
+    request = make_request(
+        world=make_world(("actor_a",)), seed=seed_for_base_roll(2), first_round_order=["actor_a"]
+    )
+    before = deepcopy(request)
+    if source is not None:
+        with pytest.raises(errors.UmpireResolutionError):
+            runner.run(
+                request,
+                callbacks.proposal_generator,
+                callbacks.peer_reviewer,
+                callbacks.failure_resolver,
+            )
+    else:
+        result = runner.run(
+            request,
+            callbacks.proposal_generator,
+            callbacks.peer_reviewer,
+            callbacks.failure_resolver,
+        )
+        assert result.turn_records[0].net_vote_modifier == 0
+        assert result.turn_records[0].peer_evaluations == []
+        assert result.final_world_state.session_index == 1
+        assert callbacks.failure_calls[0][3] == []
+    assert not callbacks.peer_calls and request == before
+
+
+def test_invalid_failure_decision_aborts():
+    callbacks = ScriptedCallbacks(failure=lambda *args: None)
+    request = make_request(seed=seed_for_base_roll(2), first_round_order=["actor_a", "actor_b"])
+    before = deepcopy(request)
+    with pytest.raises(errors.UmpireResolutionError) as caught:
+        runner.run(
+            request,
+            callbacks.proposal_generator,
+            callbacks.peer_reviewer,
+            callbacks.failure_resolver,
+        )
+    assert request == before
+    assert not hasattr(caught.value, "partial_result")
+
+
+def test_state_change_records(monkeypatch):
+    monkeypatch.setattr(runner, "roll_resolution", lambda rng: (4, 4))
+    callbacks = ScriptedCallbacks()
+    result = runner.run(
+        make_request(
+            world=make_world(("actor_a", "actor_b", "actor_c"), session_index=3, turn_index=7),
+            turn_count=4,
+            seed=20,
+        ),
+        callbacks.proposal_generator,
+        callbacks.peer_reviewer,
+        callbacks.failure_resolver,
+    )
+    canon = ["Fact 1."]
+    for i, record in enumerate(result.turn_records):
+        after = [*canon, record.proposal.world_change_statement]
+        expected = [
+            {
+                "path": "/canon_facts",
+                "before": canon,
+                "after": after,
+                "reason": "proposal-succeeded",
+            }
+        ]
+        if i == 2:
+            expected.append(
+                {"path": "/session_index", "before": 3, "after": 4, "reason": "round-complete"}
+            )
+        expected.append(
+            {"path": "/turn_index", "before": 7 + i, "after": 8 + i, "reason": "turn-tick"}
+        )
+        assert [change.model_dump() for change in record.state_changes] == expected
+        assert [change.path for change in record.state_changes] == sorted(
+            {change.path for change in record.state_changes}
+        )
+        canon = after
+    result.final_world_state.canon_facts.append("Later caller change.")
+    assert "Later caller change." not in result.turn_records[-1].state_changes[0].after
+
+
+def test_actors_unchanged_and_only_consequence_enters_canon():
+    request = make_request(
+        world=make_world(("actor_a", "actor_b", "actor_c")),
+        seed=seed_for_base_roll(2),
+        first_round_order=["actor_a", "actor_b", "actor_c"],
+    )
+    callbacks = ScriptedCallbacks()
+    result = runner.run(
+        request, callbacks.proposal_generator, callbacks.peer_reviewer, callbacks.failure_resolver
+    )
+    assert (
+        result.final_world_state.actors
+        == models.WorldState.model_validate(request["world_state"]).actors
+    )
+    assert result.final_world_state.canon_facts == ["Fact 1.", "Consequence 1."]
+    assert result.final_world_state.model_dump().keys() == {
+        "actors",
+        "canon_facts",
+        "session_index",
+        "turn_index",
+    }
+
+
+@pytest.mark.parametrize(
+    "kind,error_cls",
+    [
+        ("proposal", errors.ProposalGenerationError),
+        ("peer", errors.PeerReviewError),
+        ("umpire", errors.UmpireReviewError),
+        ("failure", errors.UmpireResolutionError),
+    ],
+)
+@pytest.mark.parametrize(
+    "exception",
+    [
+        ValueError,
+        RecursionError,
+        SystemError,
+        MemoryError,
+        KeyboardInterrupt,
+        errors.InvalidProposalError,
+    ],
+)
+def test_callback_exceptions_wrapped(kind, error_cls, exception):
+    original = exception("Callback failed.")
+
+    def fail(*args):
+        raise original
+
+    def peer(actor, proposal, state):
+        return {
+            "voter_actor_id": actor.id,
+            "baseline_plausibility": 0,
+            "final_vote": 1,
+            "biased_shift_applied": False,
+            "cited_anchor": "Fact 1.",
+            "public_argument": "",
+        }
+
+    callbacks = ScriptedCallbacks(**{"peer": peer, kind: fail})
+    request = make_request(seed=seed_for_base_roll(2), first_round_order=["actor_a", "actor_b"])
+    before = deepcopy(request)
+    expected = exception if exception in (MemoryError, KeyboardInterrupt) else error_cls
+    with pytest.raises(expected) as caught:
+        runner.run(
+            request,
+            callbacks.proposal_generator,
+            callbacks.peer_reviewer,
+            callbacks.failure_resolver,
+            callbacks.umpire_review,
+        )
+    assert request == before
+    if expected is error_cls:
+        assert caught.value.__cause__ is original
+    else:
+        assert caught.value is original
+
+
+@pytest.mark.parametrize(
+    "kind,error_cls",
+    [("umpire", errors.UmpireReviewError), ("failure", errors.UmpireResolutionError)],
+)
+@pytest.mark.parametrize("exception", [concurrent.futures.CancelledError, asyncio.CancelledError])
+def test_callback_cancellation(kind, error_cls, exception):
+    original = exception("Cancelled.")
+
+    def cancel(*args):
+        raise original
+
+    callbacks = ScriptedCallbacks(
+        **{
+            "peer": lambda actor, proposal, state: {
+                "voter_actor_id": actor.id,
+                "baseline_plausibility": 0,
+                "final_vote": 1,
+                "biased_shift_applied": True,
+                "cited_anchor": "Fact 1.",
+                "public_argument": "",
+            },
+            kind: cancel,
+        }
+    )
+    request = make_request(seed=seed_for_base_roll(2), first_round_order=["actor_a", "actor_b"])
+    before = deepcopy(request)
+    expected = exception if exception is asyncio.CancelledError else error_cls
+    with pytest.raises(expected) as caught:
+        runner.run(
+            request,
+            callbacks.proposal_generator,
+            callbacks.peer_reviewer,
+            callbacks.failure_resolver,
+            callbacks.umpire_review,
+        )
+    assert request == before
+    if expected is error_cls:
+        assert caught.value.__cause__ is original
+    else:
+        assert caught.value is original
+
+
+def test_callbacks_receive_isolated_snapshots():
+    defaults = ScriptedCallbacks(
+        peer=lambda actor, proposal, state: {
+            "voter_actor_id": actor.id,
+            "baseline_plausibility": 0,
+            "final_vote": 1,
+            "biased_shift_applied": True,
+            "cited_anchor": "Fact 1.",
+            "public_argument": "Reason.",
+        }
+    )
+    request = make_request(seed=seed_for_base_roll(2), first_round_order=["actor_a", "actor_b"])
+    before = deepcopy(request)
+    expected = runner.run(
+        request,
+        defaults.proposal_generator,
+        defaults.peer_reviewer,
+        defaults.failure_resolver,
+        defaults.umpire_review,
+    )
+
+    def proposal(actor, tier, tags, state):
+        raw = defaults.proposal_generator(actor, tier, tags, state)
+        assert actor is not state.actors[0]
+        actor.name = "Renamed."
+        state.actors[0].agenda = "Changed."
+        state.canon_facts.append("Injected by generator.")
+        tags.append("Extra tag.")
+        return raw
+
+    def peer(actor, proposal, state):
+        raw = defaults.peer_reviewer(actor, proposal, state)
+        actor.name = "Renamed peer."
+        proposal.supporting_pros.append(proposal.supporting_pros[0].model_copy(deep=True))
+        proposal.world_change_statement = "Injected proposal."
+        state.canon_facts.append("Injected by peer.")
+        return raw
+
+    def umpire(turn, proposal, evaluations, state):
+        proposal.supporting_pros.clear()
+        evaluations[0].final_vote = -1
+        state.canon_facts.append("Injected by umpire.")
+        return []
+
+    def failure(turn, proposal, evaluations, candidates, total, state):
+        raw = defaults.failure_resolver(turn, proposal, evaluations, candidates, total, state)
+        proposal.supporting_pros.clear()
+        evaluations[0].final_vote = -1
+        candidates.append("unknown")
+        state.actors[0].name = "Changed again."
+        state.canon_facts.append("Injected by resolver.")
+        return raw
+
+    callbacks = ScriptedCallbacks(proposal=proposal, peer=peer, umpire=umpire, failure=failure)
+    actual = runner.run(
+        request,
+        callbacks.proposal_generator,
+        callbacks.peer_reviewer,
+        callbacks.failure_resolver,
+        callbacks.umpire_review,
+    )
+    assert actual == expected and request == before
+    assert (
+        len(callbacks.proposal_calls)
+        == len(callbacks.peer_calls)
+        == len(callbacks.umpire_calls)
+        == len(callbacks.failure_calls)
+        == 1
+    )
+    states = [
+        callbacks.proposal_calls[0][3],
+        callbacks.peer_calls[0][2],
+        callbacks.umpire_calls[0][3],
+        callbacks.failure_calls[0][5],
+    ]
+    assert len({id(state) for state in states}) == 4
+    assert len({id(state.canon_facts) for state in states}) == 4
+    assert callbacks.umpire_calls[0][2][0] is not callbacks.failure_calls[0][2][0]
+    assert callbacks.peer_calls[0][1] is not callbacks.umpire_calls[0][1]
+
+
+def test_model_instance_returns_accepted():
+    class Draft(models.ProposalDraft):
+        pass
+
+    callbacks = ScriptedCallbacks(
+        proposal=lambda *args: Draft(
+            world_change_statement="New event.",
+            supporting_pros=[
+                models.SupportingPro(
+                    source_type="canon_fact", source_ref="Fact 1.", argument="Reason."
+                )
+            ],
+        ),
+        peer=lambda actor, proposal, state: models.PeerEvaluation(
+            voter_actor_id=actor.id,
+            baseline_plausibility=1,
+            final_vote=0,
+            biased_shift_applied=False,
+            cited_anchor=' "Fact 1." ',
+            public_argument="Original.",
+        ),
+        umpire=lambda *args: [
+            models.UmpireRejection(voter_actor_id="actor_b", reason="Illogical.")
+        ],
+        failure=lambda *args: models.FailureResolution(
+            source_voter_actor_id="actor_b",
+            world_change_statement="Consequence.",
+            rationale="Reason.",
+        ),
+    )
+    result = runner.run(
+        make_request(seed=seed_for_base_roll(2), first_round_order=["actor_a", "actor_b"]),
+        callbacks.proposal_generator,
+        callbacks.peer_reviewer,
+        callbacks.failure_resolver,
+        callbacks.umpire_review,
+    )
+    assert result.final_world_state.canon_facts == ["Fact 1.", "Consequence."]
+    record = result.turn_records[0]
+    assert record.proposal.world_change_statement == "New event."
+    assert record.peer_evaluations[0].final_vote == 1
+    assert record.umpire_rejections[0].evaluation_before_reversion.cited_anchor == "Fact 1."
+
+
+def test_callback_model_shapes_revalidated():
+    for raw in [
+        models.Actor(id="actor_a", name="Actor A", agenda="Agenda A"),
+        models.ProposalDraft.model_construct(world_change_statement=" ", supporting_pros=[]),
+        models.ProposalDraft.model_construct(
+            world_change_statement="New event.",
+            supporting_pros=[
+                models.SupportingPro.model_construct(
+                    source_type="canon_fact", source_ref=None, argument=""
+                ),
+            ],
+        ),
+    ]:
+        callbacks = ScriptedCallbacks(proposal=lambda *args, raw=raw: raw)
+        with pytest.raises(errors.ProposalGenerationError):
+            runner.run(
+                make_request(seed=20),
+                callbacks.proposal_generator,
+                callbacks.peer_reviewer,
+                callbacks.failure_resolver,
+            )
+
+
+@pytest.mark.parametrize(
+    "exception", [ValueError, RecursionError, SystemError, MemoryError, KeyboardInterrupt]
+)
+@pytest.mark.parametrize("kind", ["mapping", "model"])
+def test_request_conversion_exception_boundaries(exception, kind, monkeypatch):
+    original = exception("Request conversion failed.")
+
+    class BrokenMapping(Mapping):
+        def __iter__(self):
+            raise original
+
+        def __len__(self):
+            return 1
+
+        def __getitem__(self, key):
+            raise original
+
+    class BrokenRequest(models.RunRequest):
+        def model_dump(self, **kwargs):
+            raise original
+
+    request = BrokenMapping() if kind == "mapping" else BrokenRequest.model_construct()
+    callbacks = ScriptedCallbacks()
+    draws = []
+    monkeypatch.setattr(runner.random, "Random", lambda *args: draws.append(args))
+    expected = (
+        exception
+        if exception in (MemoryError, KeyboardInterrupt)
+        else errors.InvalidRunRequestError
+    )
+    with pytest.raises(expected) as caught:
+        runner.run(
+            request,
+            callbacks.proposal_generator,
+            callbacks.peer_reviewer,
+            callbacks.failure_resolver,
+        )
+    assert not draws and not callbacks.proposal_calls
+    if expected is errors.InvalidRunRequestError:
+        assert caught.value.__cause__ is original
+    else:
+        assert caught.value is original
+
+
+@pytest.mark.parametrize(
+    "target",
+    [
+        "snapshot",
+        "build_proposal",
+        "validate_peer_evaluation",
+        "apply_umpire_rejections",
+        "validate_failure_resolution",
+    ],
+)
+def test_callback_wrapping_excludes_snapshot_preparation_and_gates(target, monkeypatch):
+    original = ValueError("Internal preparation or gate failed.")
+
+    def fail(*args, **kwargs):
+        raise original
+
+    callbacks = ScriptedCallbacks(
+        peer=lambda actor, proposal, state: {
+            "voter_actor_id": actor.id,
+            "baseline_plausibility": 0,
+            "final_vote": 1,
+            "biased_shift_applied": True,
+            "cited_anchor": "Fact 1.",
+            "public_argument": "",
+        }
+    )
+    if target == "snapshot":
+        monkeypatch.setattr(models.Actor, "model_copy", fail)
+    else:
+        monkeypatch.setattr(runner, target, fail)
+    with pytest.raises(errors.MechanicsError) as caught:
+        runner.run(
+            make_request(seed=seed_for_base_roll(2), first_round_order=["actor_a", "actor_b"]),
+            callbacks.proposal_generator,
+            callbacks.peer_reviewer,
+            callbacks.failure_resolver,
+            callbacks.umpire_review,
+        )
+    assert caught.value.__cause__ is original
+
+
+@pytest.mark.parametrize(
+    "exception",
+    [
+        ValueError,
+        RecursionError,
+        SystemError,
+        MemoryError,
+        KeyboardInterrupt,
+        errors.InvalidProposalError,
+    ],
+)
+def test_engine_internal_exceptions(exception, monkeypatch):
+    original = exception("Internal failure.")
+
+    def fail(*args):
+        raise original
+
+    monkeypatch.setattr(runner, "draw_turn_cues", fail)
+    callbacks = ScriptedCallbacks()
+    expected = errors.MechanicsError if exception is ValueError else exception
+    with pytest.raises(expected) as caught:
+        runner.run(
+            make_request(seed=20),
+            callbacks.proposal_generator,
+            callbacks.peer_reviewer,
+            callbacks.failure_resolver,
+        )
+    if exception is ValueError:
+        assert caught.value.__cause__ is original
+    else:
+        assert caught.value is original
+
+
+def test_public_api_exports():
+    expected = {
+        "run",
+        "CONTRACT_VERSION",
+        "DEFAULT_TABLE_SET_ID",
+        "Actor",
+        "WorldState",
+        "SupportingPro",
+        "ProposalDraft",
+        "Proposal",
+        "PeerEvaluation",
+        "UmpireRejection",
+        "UmpireRejectionRecord",
+        "FailureResolution",
+        "StateChange",
+        "TurnRecord",
+        "SparkTables",
+        "RunRequest",
+        "RunResult",
+        "RunFailure",
+        "RunError",
+        "InvalidRunRequestError",
+        "ProposalGenerationError",
+        "InvalidProposalError",
+        "PeerReviewError",
+        "UmpireReviewError",
+        "UmpireResolutionError",
+        "MechanicsError",
+        "ProposalGenerator",
+        "PeerReviewer",
+        "UmpireReview",
+        "FailureResolver",
+    }
+    assert set(tome.engine.__all__) == expected
+    assert len(tome.engine.__all__) == len(expected)
+    assert set(tome.__all__) == expected | {"__version__"}
+    assert tome.run is runner.run is tome.engine.run
+    assert tome.CONTRACT_VERSION == "1.1.0" and tome.__version__ == "0.1.0"
+    assert all(getattr(tome, name) is getattr(tome.engine, name) for name in expected)
+    for protocol in [
+        protocols.ProposalGenerator,
+        protocols.PeerReviewer,
+        protocols.UmpireReview,
+        protocols.FailureResolver,
+    ]:
+        parameters = list(inspect.signature(protocol.__call__).parameters.values())[1:]
+        assert all(parameter.kind is inspect.Parameter.POSITIONAL_ONLY for parameter in parameters)
+
+
+def test_run_error_exposes_failure_code():
+    callbacks = ScriptedCallbacks(
+        proposal=lambda *args: {
+            "world_change_statement": "Fact 1.",
+            "supporting_pros": [
+                {"source_type": "canon_fact", "source_ref": "Fact 1.", "argument": ""},
+            ],
+        }
+    )
+    with pytest.raises(errors.InvalidProposalError) as caught:
+        runner.run(
+            make_request(seed=20),
+            callbacks.proposal_generator,
+            callbacks.peer_reviewer,
+            callbacks.failure_resolver,
+        )
+    failure = caught.value.to_failure()
+    assert failure.code == "INVALID_PROPOSAL"
+    assert failure.contract_version == "1.1.0" and failure.message == caught.value.message
