@@ -1,13 +1,15 @@
 import random
+from collections.abc import Mapping
 from copy import deepcopy
 from itertools import combinations
+from types import MappingProxyType
 
 import pytest
 from pydantic import ValidationError
 from support import INVALID_REQUEST_CASES, make_request, make_world, override_tables
 
 from tome import tables as built_in_tables
-from tome.engine import errors, mechanics, models, text
+from tome.engine import errors, gates, mechanics, models, text
 
 
 def test_normalization_vectors():
@@ -336,3 +338,527 @@ def test_mechanics_checks_dice_and_table_lookups(monkeypatch):
     monkeypatch.setattr(mechanics, "TABLE_ACTION", {})
     with pytest.raises(errors.MechanicsError):
         mechanics.default_spark_tables()
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        "non-mapping",
+        "missing",
+        "extra",
+        "blank",
+        "quoted-empty",
+        "source-type",
+        "zero-pros",
+        "three-pros",
+        "tuple-pros",
+    ],
+)
+def test_proposal_shape_errors(case):
+    draft = {
+        "world_change_statement": "New event.",
+        "supporting_pros": [{"source_type": "canon_fact", "source_ref": "Fact 1.", "argument": ""}],
+    }
+    if case == "non-mapping":
+        draft = "not a mapping"
+    elif case == "missing":
+        del draft["world_change_statement"]
+    elif case == "extra":
+        draft["active_actor_id"] = "actor_a"
+    elif case == "blank":
+        draft["world_change_statement"] = "  "
+    elif case == "quoted-empty":
+        draft["world_change_statement"] = '""'
+    elif case == "source-type":
+        draft["supporting_pros"][0]["source_type"] = "actor_trait"
+    elif case == "zero-pros":
+        draft["supporting_pros"] = []
+    elif case == "three-pros":
+        draft["supporting_pros"] *= 3
+    else:
+        draft["supporting_pros"] = tuple(draft["supporting_pros"])
+    cues = mechanics.TurnCues(1, "Obvious", ("Action", "Focus"), (11, 11), ("Action:X", "Focus:Y"))
+    with pytest.raises(errors.ProposalGenerationError):
+        gates.build_proposal(draft, active_actor_id="actor_a", cues=cues, canon_facts=["Fact 1."])
+
+
+@pytest.mark.parametrize("statement", ["Fact 1.", '  "Fact 1."  ', "'Fact 1.'"])
+def test_proposal_duplicating_canon_rejected(statement):
+    cues = mechanics.TurnCues(1, "Obvious", ("Action", "Focus"), (11, 11), ("Action:X", "Focus:Y"))
+    draft = {
+        "world_change_statement": statement,
+        "supporting_pros": [{"source_type": "canon_fact", "source_ref": "Fact 1.", "argument": ""}],
+    }
+    with pytest.raises(errors.InvalidProposalError):
+        gates.build_proposal(draft, active_actor_id="actor_a", cues=cues, canon_facts=["Fact 1."])
+    draft["supporting_pros"] *= 3
+    with pytest.raises(errors.ProposalGenerationError):
+        gates.build_proposal(draft, active_actor_id="actor_a", cues=cues, canon_facts=["Fact 1."])
+
+
+def test_proposal_pruning_and_attachment():
+    cues = mechanics.TurnCues(6, "Odd", ("Focus", "Method"), (66, 13), ("Focus:X", "Method:Y"))
+    draft = {
+        "world_change_statement": '  "New event."  ',
+        "supporting_pros": [
+            {"source_type": "canon_fact", "source_ref": "Invented", "argument": "Prune me."},
+            {"source_type": "canon_fact", "source_ref": ' "Fact 1." ', "argument": "Keep me."},
+        ],
+    }
+    before = deepcopy(draft)
+    result = gates.build_proposal(
+        MappingProxyType(draft), active_actor_id="actor_a", cues=cues, canon_facts=["Fact 1."]
+    )
+    assert result.model_dump() == {
+        "active_actor_id": "actor_a",
+        "posture_roll": 6,
+        "trio_tier": "Odd",
+        "spark_tags": ["Focus:X", "Method:Y"],
+        "world_change_statement": '  "New event."  ',
+        "supporting_pros": [draft["supporting_pros"][1]],
+    }
+    assert draft == before
+
+
+def test_proposal_without_grounded_pros_rejected():
+    cues = mechanics.TurnCues(1, "Obvious", ("Action", "Focus"), (11, 11), ("Action:X", "Focus:Y"))
+    draft = {
+        "world_change_statement": "New event.",
+        "supporting_pros": [
+            {"source_type": "canon_fact", "source_ref": "Invented", "argument": ""}
+        ],
+    }
+    with pytest.raises(errors.InvalidProposalError):
+        gates.build_proposal(draft, active_actor_id="actor_a", cues=cues, canon_facts=["Fact 1."])
+
+
+@pytest.mark.parametrize("reference", ["Actor A", "Agenda A", "Action:X", "X"])
+def test_sparks_and_actor_metadata_do_not_ground(reference):
+    cues = mechanics.TurnCues(1, "Obvious", ("Action", "Focus"), (11, 11), ("Action:X", "Focus:Y"))
+    draft = {
+        "world_change_statement": "New event.",
+        "supporting_pros": [{"source_type": "canon_fact", "source_ref": reference, "argument": ""}],
+    }
+    with pytest.raises(errors.InvalidProposalError):
+        gates.build_proposal(draft, active_actor_id="actor_a", cues=cues, canon_facts=["Fact 1."])
+    evaluation = models.PeerEvaluation(
+        voter_actor_id="actor_b",
+        baseline_plausibility=0,
+        final_vote=1,
+        biased_shift_applied=True,
+        cited_anchor=reference,
+        public_argument="",
+    )
+    assert (
+        gates.validate_peer_evaluation(
+            evaluation, voter_actor_id="actor_b", canon_facts=["Fact 1."]
+        ).final_vote
+        == 0
+    )
+    assert (
+        gates.validate_peer_evaluation(
+            evaluation, voter_actor_id="actor_b", canon_facts=[reference]
+        ).final_vote
+        == 1
+    )
+
+
+def test_canon_fact_reusable_across_turns():
+    canon = ["Fact 1."]
+    cues = mechanics.TurnCues(1, "Obvious", ("Action", "Focus"), (11, 11), ("Action:X", "Focus:Y"))
+    for i in range(3):
+        proposal = gates.build_proposal(
+            {
+                "world_change_statement": f"Event {i}.",
+                "supporting_pros": [
+                    {"source_type": "canon_fact", "source_ref": "Fact 1.", "argument": ""}
+                ],
+            },
+            active_actor_id="actor_a",
+            cues=cues,
+            canon_facts=canon,
+        )
+        assert proposal.supporting_pros[0].source_ref == "Fact 1."
+    assert canon == ["Fact 1."]
+
+
+def test_historical_canon_grounding():
+    canon = ["Actor A has capability X", "Actor A loses capability X"]
+    cues = mechanics.TurnCues(1, "Obvious", ("Action", "Focus"), (11, 11), ("Action:X", "Focus:Y"))
+    for fact in canon:
+        draft = {
+            "world_change_statement": "New event.",
+            "supporting_pros": [
+                {
+                    "source_type": "canon_fact",
+                    "source_ref": fact,
+                    "argument": "Historical reference.",
+                },
+            ],
+        }
+        assert (
+            gates.build_proposal(draft, active_actor_id="actor_a", cues=cues, canon_facts=canon)
+            .supporting_pros[0]
+            .source_ref
+            == fact
+        )
+        draft["world_change_statement"] = f' "{fact}" '
+        with pytest.raises(errors.InvalidProposalError):
+            gates.build_proposal(draft, active_actor_id="actor_a", cues=cues, canon_facts=canon)
+        with pytest.raises(errors.UmpireResolutionError):
+            gates.validate_failure_resolution(
+                {
+                    "source_voter_actor_id": None,
+                    "world_change_statement": f' "{fact}" ',
+                    "rationale": "Reason.",
+                },
+                candidate_voter_ids=[],
+                canon_facts=canon,
+                rejected_statement="Proposal.",
+            )
+    evaluation = gates.validate_peer_evaluation(
+        {
+            "voter_actor_id": "actor_b",
+            "baseline_plausibility": 0,
+            "final_vote": 1,
+            "biased_shift_applied": False,
+            "cited_anchor": canon[0],
+            "public_argument": "History.",
+        },
+        voter_actor_id="actor_b",
+        canon_facts=canon,
+    )
+    assert evaluation.final_vote == 1
+    after, records = gates.apply_umpire_rejections(
+        [
+            {
+                "voter_actor_id": "actor_b",
+                "reason": "No longer relevant.",
+            }
+        ],
+        evaluations=[evaluation],
+    )
+    assert after[0].final_vote == 0
+    assert records[0].evaluation_before_reversion == evaluation
+    assert canon == ["Actor A has capability X", "Actor A loses capability X"]
+
+
+@pytest.mark.parametrize("baseline,final", [(1, -1), (-1, 1)])
+def test_two_step_shift_reverts(baseline, final):
+    evaluation = gates.validate_peer_evaluation(
+        {
+            "voter_actor_id": "actor_b",
+            "baseline_plausibility": baseline,
+            "final_vote": final,
+            "biased_shift_applied": True,
+            "cited_anchor": "Fact 1.",
+            "public_argument": "Original.",
+        },
+        voter_actor_id="actor_b",
+        canon_facts=["Fact 1."],
+    )
+    assert evaluation.final_vote == baseline
+    assert evaluation.biased_shift_applied is False
+    assert evaluation.cited_anchor is None
+    assert evaluation.public_argument == "Original."
+
+
+@pytest.mark.parametrize("baseline", [-1, 0, 1])
+@pytest.mark.parametrize("final", [-1, 0, 1])
+def test_votes_stay_in_range(baseline, final):
+    evaluation = gates.validate_peer_evaluation(
+        {
+            "voter_actor_id": "actor_b",
+            "baseline_plausibility": baseline,
+            "final_vote": final,
+            "biased_shift_applied": False,
+            "cited_anchor": "Fact 1.",
+            "public_argument": "",
+        },
+        voter_actor_id="actor_b",
+        canon_facts=["Fact 1."],
+    )
+    assert evaluation.final_vote in {-1, 0, 1}
+    assert abs(evaluation.final_vote - baseline) <= 1
+
+
+@pytest.mark.parametrize(
+    "baseline,final,flag,anchor,expected",
+    [
+        (0, 1, False, '  "Fact 1."  ', 1),
+        (1, 0, False, "Fact 1.", 0),
+        (0, 1, True, None, 0),
+        (0, -1, True, "Invented", 0),
+        (1, 1, True, "Fact 1.", 1),
+    ],
+)
+def test_shift_metadata_follows_numeric_shift(baseline, final, flag, anchor, expected):
+    evaluation = gates.validate_peer_evaluation(
+        {
+            "voter_actor_id": "actor_b",
+            "baseline_plausibility": baseline,
+            "final_vote": final,
+            "biased_shift_applied": flag,
+            "cited_anchor": anchor,
+            "public_argument": "Unchanged.",
+        },
+        voter_actor_id="actor_b",
+        canon_facts=["Fact 1."],
+    )
+    assert evaluation.final_vote == expected
+    assert evaluation.biased_shift_applied is (expected != baseline)
+    assert evaluation.cited_anchor == ("Fact 1." if expected != baseline else None)
+    assert evaluation.baseline_plausibility == baseline
+    assert evaluation.public_argument == "Unchanged."
+
+
+def test_peer_voter_id_compared_exactly():
+    with pytest.raises(errors.PeerReviewError):
+        gates.validate_peer_evaluation(
+            {
+                "voter_actor_id": '"actor_b"',
+                "baseline_plausibility": 0,
+                "final_vote": 0,
+                "biased_shift_applied": False,
+                "cited_anchor": None,
+                "public_argument": "",
+            },
+            voter_actor_id="actor_b",
+            canon_facts=["Fact 1."],
+        )
+
+
+@pytest.mark.parametrize("case", ["missing", "extra", "bool", "out-of-range", "non-mapping"])
+def test_peer_shape_errors(case):
+    raw = {
+        "voter_actor_id": "actor_b",
+        "baseline_plausibility": 0,
+        "final_vote": 0,
+        "biased_shift_applied": False,
+        "cited_anchor": None,
+        "public_argument": "",
+    }
+    if case == "missing":
+        del raw["biased_shift_applied"]
+    elif case == "extra":
+        raw["goal_alignment"] = 0
+    elif case == "bool":
+        raw["final_vote"] = True
+    elif case == "out-of-range":
+        raw["final_vote"] = 2
+    else:
+        raw = None
+    with pytest.raises(errors.PeerReviewError):
+        gates.validate_peer_evaluation(raw, voter_actor_id="actor_b", canon_facts=["Fact 1."])
+
+
+@pytest.mark.parametrize("baseline", [1, -1])
+def test_umpire_rejection_reverts_and_records(baseline):
+    evaluation = gates.validate_peer_evaluation(
+        {
+            "voter_actor_id": "actor_b",
+            "baseline_plausibility": baseline,
+            "final_vote": 0,
+            "biased_shift_applied": False,
+            "cited_anchor": '  "Fact 1."  ',
+            "public_argument": "Keep original.",
+        },
+        voter_actor_id="actor_b",
+        canon_facts=["Fact 1."],
+    )
+    assert evaluation.biased_shift_applied is True
+    after, records = gates.apply_umpire_rejections(
+        [
+            {
+                "voter_actor_id": "actor_b",
+                "reason": "Illogical.",
+            }
+        ],
+        evaluations=[evaluation],
+    )
+    assert after[0].final_vote == baseline
+    assert after[0].biased_shift_applied is False and after[0].cited_anchor is None
+    assert after[0].public_argument == "Keep original."
+    assert after[0].baseline_plausibility == baseline
+    assert records[0].reason == "Illogical."
+    assert records[0].evaluation_before_reversion == evaluation
+    assert records[0].evaluation_before_reversion is not evaluation
+    after[0].public_argument = "Mutated."
+    assert records[0].evaluation_before_reversion.public_argument == "Keep original."
+    assert evaluation.final_vote == 0
+
+
+def test_umpire_records_in_peer_order():
+    evaluations = [
+        models.PeerEvaluation(
+            voter_actor_id=actor_id,
+            baseline_plausibility=0,
+            final_vote=1,
+            biased_shift_applied=True,
+            cited_anchor="Fact 1.",
+            public_argument=actor_id,
+        )
+        for actor_id in ["actor_c", "actor_b", "actor_d"]
+    ]
+    after, records = gates.apply_umpire_rejections(
+        [
+            {"voter_actor_id": "actor_b", "reason": "B."},
+            {"voter_actor_id": "actor_c", "reason": "C."},
+        ],
+        evaluations=evaluations,
+    )
+    assert [r.voter_actor_id for r in records] == ["actor_c", "actor_b"]
+    assert [e.final_vote for e in after] == [0, 0, 1]
+    assert [e.final_vote for e in evaluations] == [1, 1, 1]
+    assert all(a is not b for a, b in zip(after, evaluations))
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        [{"voter_actor_id": "actor_b", "reason": "Reason."}] * 2,
+        [{"voter_actor_id": "unknown", "reason": "Reason."}],
+        [{"voter_actor_id": "actor_a", "reason": "Reason."}],
+        [{"voter_actor_id": "actor_c", "reason": "At baseline."}],
+        [{"voter_actor_id": '"actor_b"', "reason": "Inexact."}],
+        [{"voter_actor_id": "actor_b", "reason": " "}],
+        [{"voter_actor_id": "actor_b", "reason": "Reason.", "extra": 1}],
+        (),
+        None,
+        {},
+    ],
+)
+def test_umpire_rejection_errors(raw):
+    evaluations = [
+        models.PeerEvaluation(
+            voter_actor_id=actor_id,
+            baseline_plausibility=0,
+            final_vote=vote,
+            biased_shift_applied=bool(vote),
+            cited_anchor="Fact 1." if vote else None,
+            public_argument="",
+        )
+        for actor_id, vote in [("actor_b", 1), ("actor_c", 0)]
+    ]
+    with pytest.raises(errors.UmpireReviewError):
+        gates.apply_umpire_rejections(raw, evaluations=evaluations)
+
+
+@pytest.mark.parametrize(
+    "votes,expected",
+    [
+        ([-1, -1, 0], ["v0", "v1"]),
+        ([0, 0], ["v0", "v1"]),
+        ([1, 1], ["v0", "v1"]),
+        ([1], ["v0"]),
+        ([], []),
+    ],
+)
+def test_lowest_vote_candidates(votes, expected):
+    evaluations = [
+        models.PeerEvaluation(
+            voter_actor_id=f"v{i}",
+            baseline_plausibility=vote,
+            final_vote=vote,
+            biased_shift_applied=False,
+            cited_anchor=None,
+            public_argument="",
+        )
+        for i, vote in enumerate(votes)
+    ]
+    assert gates.lowest_vote_candidates(evaluations) == expected
+
+
+def test_failure_resolution_validation():
+    for source, statement in [
+        ("actor_b", "Original peer argument."),
+        ("actor_b", "Restated event."),
+        (None, ' "New event." '),
+    ]:
+        raw = {
+            "source_voter_actor_id": source,
+            "world_change_statement": statement,
+            "rationale": " Umpire decision. ",
+        }
+        assert (
+            gates.validate_failure_resolution(
+                raw,
+                candidate_voter_ids=["actor_b"],
+                canon_facts=["Fact 1."],
+                rejected_statement="Proposal.",
+            ).model_dump()
+            == raw
+        )
+    invalid = [
+        {"source_voter_actor_id": "actor_c"},
+        {"source_voter_actor_id": "unknown"},
+        {"source_voter_actor_id": '"actor_b"'},
+        {"world_change_statement": ""},
+        {"world_change_statement": '""'},
+        {"world_change_statement": ' "Fact 1." '},
+        {"world_change_statement": ' "Proposal." '},
+        {"rationale": " "},
+        {"rationale": '""'},
+        {"extra": 1},
+    ]
+    for changes in invalid:
+        raw = {
+            "source_voter_actor_id": "actor_b",
+            "world_change_statement": "New event.",
+            "rationale": "Reason.",
+            **changes,
+        }
+        with pytest.raises(errors.UmpireResolutionError):
+            gates.validate_failure_resolution(
+                raw,
+                candidate_voter_ids=["actor_b"],
+                canon_facts=["Fact 1."],
+                rejected_statement="Proposal.",
+            )
+    for raw in [
+        None,
+        {
+            "source_voter_actor_id": "actor_b",
+            "world_change_statement": "New event.",
+            "rationale": "Reason.",
+        },
+    ]:
+        with pytest.raises(errors.UmpireResolutionError):
+            gates.validate_failure_resolution(
+                raw, candidate_voter_ids=[], canon_facts=["Fact 1."], rejected_statement="Proposal."
+            )
+
+
+@pytest.mark.parametrize(
+    "exception", [ValueError, RecursionError, SystemError, MemoryError, KeyboardInterrupt]
+)
+@pytest.mark.parametrize("kind", ["mapping", "model"])
+def test_callback_output_conversion_exception_boundaries(exception, kind):
+    original = exception("Conversion failed.")
+
+    class BrokenMapping(Mapping):
+        def __iter__(self):
+            raise original
+
+        def __len__(self):
+            return 1
+
+        def __getitem__(self, key):
+            raise original
+
+    class BrokenDraft(models.ProposalDraft):
+        def model_dump(self, **kwargs):
+            raise original
+
+    raw = BrokenMapping() if kind == "mapping" else BrokenDraft.model_construct()
+    expected = (
+        exception
+        if exception in (MemoryError, KeyboardInterrupt)
+        else errors.ProposalGenerationError
+    )
+    with pytest.raises(expected) as caught:
+        gates._validate_output(raw, models.ProposalDraft, errors.ProposalGenerationError)
+    if expected is errors.ProposalGenerationError:
+        assert caught.value.__cause__ is original
+    else:
+        assert caught.value is original
