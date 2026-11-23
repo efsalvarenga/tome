@@ -4,7 +4,7 @@
 *   **Status:** Approved
 *   **Date:** 2026-11-17
 *   **Approved:** 2026-11-18 by the human developer, accepting the plan after the Stage 9 implementation-readiness review stopped past its five-round cap with no open findings; see the [review record](../reviews/001_tome_core_architecture_egm/implementation_readiness/implementation_readiness_report.md)
-*   **Amended:** 2026-11-23 by the human developer; see [Amendment A1](#amendment-a1-post-review-simplifications-2026-11-23)
+*   **Amended:** 2026-11-23 by the human developer; see [Amendment A1](#amendment-a1-post-review-simplifications-2026-11-23) for approved code changes and [Amendment A2](#amendment-a2-delivery-and-process-deviations-2026-11-23) for every other deviation from this plan, recorded for final human review
 *   **Implements:** [Spec 001, version 1.1.2, Interface Contract 1.1.0](../designs/001_tome_core_architecture.md), approved 2026-11-17 at commit `7d3fef1`
 
 This document decides how to implement the approved specification.
@@ -529,6 +529,39 @@ For every draw that `random.Random` can produce, none changes the result or erro
     `test_run_reports_mechanics_defects` replaces the direct mechanics checks with table-entry and built-in-table defects raised through `run()`; `test_tier_mapping_rejects_invalid_faces` still covers the d6 range check.
     `test_seeded_runs_are_reproducible` runs with seeds 0 and 42 and asserts that turn draws vary within one run (issue #9).
     `test_umpire_records_in_peer_order` no longer requires unrejected evaluations to be copied.
+
+### Amendment A2: Delivery and Process Deviations (2026-11-23)
+
+This amendment records every remaining deviation from the plan as approved on 2026-11-18, for the human developer's final review before merge.
+Items 1 to 5 change no engine behaviour; item 6 records where A1 departs from the specification's wording.
+
+1.  **Branch and commit identities (D17, Starting Baseline, Verification Plan):** the work was done on `feat/trio-engine-1.1` as D17 requires.
+    PR #5 had already squash-merged that branch's earlier commits into `main` as `7c71a29`, so on 2026-11-23 the 13 later commits were rebased, with identical trees, onto `main` as `feat/spec-1.1.2-engine` for PR #12.
+    Commit identifiers in this plan refer to the original branch; their PR #12 equivalents are below, and a squash merge will leave neither on `main`.
+
+    | Original (`feat/trio-engine-1.1`) | PR #12 (`feat/spec-1.1.2-engine`) | Commit |
+    | :--- | :--- | :--- |
+    | `3d03f61` | `58d6a87` | Consolidated EGM architecture review |
+    | `7d3fef1` | `32a4813` | Spec 1.1.2 approval; the baseline for every Verification Plan check |
+    | `7133460` | `dd5ded2` | This plan |
+    | `49eed13` to `ff5241a` | `77245d3` to `2f57160` | Phases 0 to 5 |
+
+2.  **Specification gate (Phase 1 step 0, Verification Plan):** no commit records a run of `validate_egm.py`.
+    The validator was removed from the shared tooling on 2026-11-17, when EGM moved to an upstream plugin that ships no equivalent, so the gate cannot be re-run.
+    The specification is byte-identical to its approved state: `git diff --exit-code 32a4813 -- docs/designs/001_tome_core_architecture.md` exits 0.
+3.  **File Boundary exception:** Amendments A1 and A2 were added, and EGM review records were edited, outside the EGM review workflow, at the human developer's direction on 2026-11-23.
+    The record edits are editorial only: six machine-specific paths became plugin-relative, two of them in `comprehension_report.md` and `zoom_out_report.md`, which lie outside the exception's `implementation_readiness/` directory, and ten headings gained their missing blank line.
+    No finding, verdict, or round outcome changed.
+4.  **Test-first cycle (Phases and Checkpoints):** the Phase 4 green commit `1f3032e` renamed the parameter of `test_run_rejects_non_mapping_request` from `request` to `value`, because pytest reserves `request` and the red commit could not reveal this while collection failed.
+    No other green commit changed a test.
+5.  **Tests beyond the traceability table:** six tests are not named in the table: `test_world_strict_python_values`, `test_optional_defaults_and_verbatim_text`, `test_request_conversion_exception_boundaries`, `test_callback_output_conversion_exception_boundaries`, `test_callback_model_shapes_revalidated`, and `test_callback_wrapping_excludes_snapshot_preparation_and_gates`.
+    `test_tier_mapping_rejects_invalid_faces` holds the faces 0 and 7 assertions that the table assigns to `test_tier_mapping_exhaustive`, and also rejects `True` and `1.0`.
+6.  **Relationship to the specification:** besides D12, A1 narrows how Invariant 15 is detected.
+    Invariant 15 describes `MechanicsError` as signalling a die result, table lookup, or counter outside its defined range.
+    After A1, the posture die and every table lookup are still checked, counters stay bounded by `WorldState` and `TurnRecord` validation, and the two resolution dice are bounded only through their sum.
+    The specification text is unchanged; issue #13 tracks aligning it with D12 and with this narrowing.
+
+At the PR #12 head, the Verification Plan checks against `32a4813` pass: contract preservation exits 0, `git diff --check` exits 0, the Phase 5 legacy-import search finds nothing, and the file-boundary listing shows only the table's files, this plan, and the records named in item 3.
 
 --------------------------------------------------------------------------------
 
