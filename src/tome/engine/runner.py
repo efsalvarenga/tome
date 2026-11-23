@@ -31,6 +31,15 @@ from tome.engine.models import CONTRACT_VERSION, RunRequest, RunResult, StateCha
 from tome.engine.protocols import FailureResolver, PeerReviewer, ProposalGenerator, UmpireReview
 
 
+def _invoke(callback, args, error_cls, message):
+    try:
+        return callback(*args)
+    except MemoryError:
+        raise
+    except Exception as exc:
+        raise error_cls(message) from exc
+
+
 def run(
     request: RunRequest | Mapping[str, Any],
     proposal_generator: ProposalGenerator,
@@ -38,6 +47,12 @@ def run(
     failure_resolver: FailureResolver,
     umpire_review: UmpireReview | None = None,
 ) -> RunResult:
+    """Run ``turn_count`` turns and return the final state with one record per turn.
+
+    A failed run raises a ``RunError`` subclass and publishes no partial result;
+    ``RunError.to_failure()`` gives the serialisable ``RunFailure``.
+    The request is never mutated.
+    """
     if not all(
         callable(callback) for callback in (proposal_generator, peer_reviewer, failure_resolver)
     ):
@@ -61,7 +76,7 @@ def run(
             tables, source = default_spark_tables(), DEFAULT_TABLE_SET_ID
         else:
             tables, source = request.spark_tables, "request"
-        rng = random.Random(request.seed) if request.seed is not None else random.Random()
+        rng = random.Random(request.seed)
         order = first_round_order(
             rng,
             [actor.id for actor in request.world_state.actors],
@@ -80,12 +95,12 @@ def run(
                 list(cues.spark_tags),
                 state.model_copy(deep=True),
             )
-            try:
-                raw = proposal_generator(*proposal_args)
-            except MemoryError:
-                raise
-            except Exception as exc:
-                raise ProposalGenerationError("Proposal generation failed.") from exc
+            raw = _invoke(
+                proposal_generator,
+                proposal_args,
+                ProposalGenerationError,
+                "Proposal generation failed.",
+            )
             proposal = build_proposal(
                 raw,
                 active_actor_id=active_id,
@@ -101,12 +116,7 @@ def run(
                     proposal.model_copy(deep=True),
                     state.model_copy(deep=True),
                 )
-                try:
-                    raw = peer_reviewer(*peer_args)
-                except MemoryError:
-                    raise
-                except Exception as exc:
-                    raise PeerReviewError("Peer review failed.") from exc
+                raw = _invoke(peer_reviewer, peer_args, PeerReviewError, "Peer review failed.")
                 evaluations.append(
                     validate_peer_evaluation(
                         raw,
@@ -125,12 +135,9 @@ def run(
                     [evaluation.model_copy(deep=True) for evaluation in evaluations],
                     state.model_copy(deep=True),
                 )
-                try:
-                    raw = umpire_review(*review_args)
-                except MemoryError:
-                    raise
-                except Exception as exc:
-                    raise UmpireReviewError("Umpire review failed.") from exc
+                raw = _invoke(
+                    umpire_review, review_args, UmpireReviewError, "Umpire review failed."
+                )
                 evaluations, umpire_rejections = apply_umpire_rejections(
                     raw, evaluations=evaluations
                 )
@@ -152,12 +159,12 @@ def run(
                     total,
                     state.model_copy(deep=True),
                 )
-                try:
-                    raw = failure_resolver(*failure_args)
-                except MemoryError:
-                    raise
-                except Exception as exc:
-                    raise UmpireResolutionError("Failure resolution failed.") from exc
+                raw = _invoke(
+                    failure_resolver,
+                    failure_args,
+                    UmpireResolutionError,
+                    "Failure resolution failed.",
+                )
                 failure_resolution = validate_failure_resolution(
                     raw,
                     candidate_voter_ids=candidates,
@@ -171,11 +178,6 @@ def run(
             state.turn_index += 1
             if (i + 1) % len(order) == 0:
                 state.session_index += 1
-            if (
-                len(state.canon_facts) != len(before_canon) + 1
-                or state.turn_index != before_turn + 1
-            ):
-                raise MechanicsError("A turn must add exactly one fact and one time tick.")
             changes = [
                 StateChange(
                     path="/canon_facts",
@@ -217,8 +219,6 @@ def run(
                     state_changes=changes,
                 )
             )
-        if len(records) != request.turn_count:
-            raise MechanicsError("The record count does not equal the requested turn count.")
         return RunResult(
             contract_version=CONTRACT_VERSION,
             final_world_state=state,

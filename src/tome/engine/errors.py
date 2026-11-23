@@ -1,6 +1,6 @@
 from typing import ClassVar
 
-from tome.engine.models import RunFailure
+from tome.engine.models import CONTRACT_VERSION, RunFailure
 
 
 class RunError(Exception):
@@ -11,7 +11,7 @@ class RunError(Exception):
         self.message = message
 
     def to_failure(self) -> RunFailure:
-        return RunFailure(contract_version="1.1.0", code=self.code, message=self.message)
+        return RunFailure(contract_version=CONTRACT_VERSION, code=self.code, message=self.message)
 
 
 class InvalidRunRequestError(RunError):

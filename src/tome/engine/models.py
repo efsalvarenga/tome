@@ -78,6 +78,12 @@ class Proposal(ContractModel):
 
 
 class PeerEvaluation(ContractModel):
+    """A peer's vote on a proposal.
+
+    The engine recomputes ``biased_shift_applied`` and ``cited_anchor``, and reverts
+    ``final_vote`` to ``baseline_plausibility`` unless a one-step shift cites a canon fact.
+    """
+
     voter_actor_id: str
     baseline_plausibility: Vote
     biased_shift_applied: bool
@@ -162,10 +168,9 @@ class RunRequest(ContractModel):
         actor_ids = [actor.id for actor in self.world_state.actors]
         if not actor_ids:
             raise ValueError("A run requires at least one actor.")
-        if self.first_round_order is not None and (
-            len(self.first_round_order) != len(actor_ids)
-            or len(set(self.first_round_order)) != len(self.first_round_order)
-            or set(self.first_round_order) != set(actor_ids)
+        # Actor IDs are already unique, so sorted equality means an exact permutation.
+        if self.first_round_order is not None and sorted(self.first_round_order) != sorted(
+            actor_ids
         ):
             raise ValueError("The order must be an exact permutation of actor IDs.")
         return self

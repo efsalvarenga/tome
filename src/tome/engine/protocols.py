@@ -14,6 +14,8 @@ from tome.engine.models import (
 
 
 class ProposalGenerator(Protocol):
+    """Drafts the active actor's proposal; each supporting pro must cite a canon fact."""
+
     def __call__(
         self,
         active_actor: Actor,
@@ -25,6 +27,8 @@ class ProposalGenerator(Protocol):
 
 
 class PeerReviewer(Protocol):
+    """Returns one non-active actor's evaluation of the proposal."""
+
     def __call__(
         self,
         voter_actor: Actor,
@@ -35,6 +39,8 @@ class PeerReviewer(Protocol):
 
 
 class UmpireReview(Protocol):
+    """Optional human review that may reject shifted votes before the resolution roll."""
+
     def __call__(
         self,
         turn_index: int,
@@ -46,6 +52,8 @@ class UmpireReview(Protocol):
 
 
 class FailureResolver(Protocol):
+    """Turns a failed proposal into one new canon fact, citing a lowest-vote peer or none."""
+
     def __call__(
         self,
         turn_index: int,

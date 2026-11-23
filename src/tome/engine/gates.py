@@ -98,20 +98,24 @@ def apply_umpire_rejections(
         rejections[voter_id] = rejection
     updated, records = [], []
     for evaluation in evaluations:
-        after = evaluation.model_copy(deep=True)
-        if evaluation.voter_actor_id in rejections:
-            rejection = rejections[evaluation.voter_actor_id]
+        rejection = rejections.get(evaluation.voter_actor_id)
+        if rejection is not None:
+            # Model revalidation stores an independent copy of the evaluation.
             records.append(
                 UmpireRejectionRecord(
                     voter_actor_id=rejection.voter_actor_id,
                     reason=rejection.reason,
-                    evaluation_before_reversion=evaluation.model_copy(deep=True),
+                    evaluation_before_reversion=evaluation,
                 )
             )
-            after.final_vote = after.baseline_plausibility
-            after.biased_shift_applied = False
-            after.cited_anchor = None
-        updated.append(after)
+            evaluation = evaluation.model_copy(
+                update={
+                    "final_vote": evaluation.baseline_plausibility,
+                    "biased_shift_applied": False,
+                    "cited_anchor": None,
+                }
+            )
+        updated.append(evaluation)
     return updated, records
 
 

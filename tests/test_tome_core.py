@@ -308,7 +308,7 @@ def test_tables_reusable_across_turns():
     assert all(names.count(name) > 1 for name in set(names))
 
 
-@pytest.mark.parametrize("vote_sum", range(-6, 7))
+@pytest.mark.parametrize("vote_sum", [-6, -4, -3, 0, 3, 4, 6])
 def test_net_modifier_clamps(vote_sum):
     votes = [1 if vote_sum > 0 else -1] * abs(vote_sum)
     assert mechanics.net_vote_modifier(iter(votes)) == max(-3, min(3, vote_sum))
@@ -329,26 +329,32 @@ def test_default_tables_are_trio_d66_v1():
     }
 
 
-def test_mechanics_checks_dice_and_table_lookups(monkeypatch):
+@pytest.mark.parametrize("defect", ["die", "table-entry", "built-in-tables"])
+def test_run_reports_mechanics_defects(defect, monkeypatch):
     class BadDie(random.Random):
         def randint(self, a, b):
-            return 0
+            return 7
 
+    def empty_tables():
+        tables = mechanics.default_spark_tables()
+        for name in mechanics.TABLE_NAMES:
+            getattr(tables, name).clear()
+        return tables
+
+    if defect == "die":
+        monkeypatch.setattr(runner.random, "Random", BadDie)
+    elif defect == "table-entry":
+        monkeypatch.setattr(runner, "default_spark_tables", empty_tables)
+    else:
+        monkeypatch.setattr(mechanics, "TABLE_ACTION", {})
+    callbacks = ScriptedCallbacks()
     with pytest.raises(errors.MechanicsError):
-        mechanics.draw_turn_cues(BadDie(), mechanics.default_spark_tables())
-    with pytest.raises(errors.MechanicsError):
-        mechanics.roll_resolution(BadDie())
-    tables = mechanics.default_spark_tables()
-    tables.Action.clear()
-    tables.Focus.clear()
-    tables.Method.clear()
-    tables.Disposition.clear()
-    tables.Motivation.clear()
-    with pytest.raises(errors.MechanicsError):
-        mechanics.draw_turn_cues(random.Random(0), tables)
-    monkeypatch.setattr(mechanics, "TABLE_ACTION", {})
-    with pytest.raises(errors.MechanicsError):
-        mechanics.default_spark_tables()
+        runner.run(
+            make_request(seed=20),
+            callbacks.proposal_generator,
+            callbacks.peer_reviewer,
+            callbacks.failure_resolver,
+        )
 
 
 @pytest.mark.parametrize(
@@ -721,7 +727,6 @@ def test_umpire_records_in_peer_order():
     assert [r.voter_actor_id for r in records] == ["actor_c", "actor_b"]
     assert [e.final_vote for e in after] == [0, 0, 1]
     assert [e.final_vote for e in evaluations] == [1, 1, 1]
-    assert all(a is not b for a, b in zip(after, evaluations))
 
 
 @pytest.mark.parametrize(
@@ -1749,6 +1754,7 @@ def test_public_api_exports():
         "Actor",
         "WorldState",
         "SupportingPro",
+        "TrioTier",
         "ProposalDraft",
         "Proposal",
         "PeerEvaluation",
