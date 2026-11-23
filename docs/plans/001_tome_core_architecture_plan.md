@@ -564,6 +564,7 @@ Items 1 to 5 and 7 change no engine behaviour; item 6 records where A1 departs f
     They are the critic, comprehension, zoom-out, and intermediate zoom-out reports, and the 18 round reports under `review_loop/round_*/` and `implementation_readiness/round_*/`.
     The five summary records that the specification and this plan link to are kept: `001_tome_core_architecture_review.md`, `consolidated_review_report.md`, `goldfish_review_report.md`, `review_loop/review_loop_report.md`, and `implementation_readiness/implementation_readiness_report.md`.
     Their 49 links to removed records now point to permanent GitHub links at commit `88df7b6`, which stays reachable through PR #12 after a squash merge.
+    `AGENTS.md` now states this as the convention for future EGM records.
 
 At the PR #12 head, the Verification Plan checks against `32a4813` pass: contract preservation exits 0, `git diff --check` exits 0, the Phase 5 legacy-import search finds nothing, and the file-boundary listing shows only the table's files, this plan, and the record changes described in items 3 and 7.
 

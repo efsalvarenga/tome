@@ -31,6 +31,8 @@ This document specifies repository calibration, architectural invariants, and ag
     A plan implements an approved specification without restating it.
     Plans stay out of `docs/designs/`, because `validate_egm.py` treats every file there as a specification.
   * EGM workflow records, including implementation-readiness reviews of plans, live under `docs/reviews/<NNN>_<feature_slug>_egm/`.
+    Commit only the summary records that a specification or plan links to, such as the consolidated, Goldfish, review-loop, and implementation-readiness reports.
+    Remove intermediate working records, such as critic, comprehension, and zoom-out reports and per-round reports, before merge, and repoint links to them at a permanent GitHub link to the last commit that contains them.
     Do not add other top-level `docs/reviews/<NNN>_*.md` files, because `validate_egm.py` reads the first top-level match as the specification's review.
 * **Strict No-Code Rule during Elephant Drafting:** Design specifications focus on contracts, state schemas, invariants, and edge cases before code is written.
 * **One Sentence per Line:** In Markdown prose, write each sentence on its own source line for cleaner diffs; code blocks, tables, and headings are exempt.
