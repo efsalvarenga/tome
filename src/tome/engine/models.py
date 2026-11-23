@@ -168,7 +168,6 @@ class RunRequest(ContractModel):
         actor_ids = [actor.id for actor in self.world_state.actors]
         if not actor_ids:
             raise ValueError("A run requires at least one actor.")
-        # Actor IDs are already unique, so sorted equality means an exact permutation.
         if self.first_round_order is not None and sorted(self.first_round_order) != sorted(
             actor_ids
         ):

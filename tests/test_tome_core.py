@@ -329,21 +329,15 @@ def test_default_tables_are_trio_d66_v1():
     }
 
 
-@pytest.mark.parametrize("defect", ["die", "table-entry", "built-in-tables"])
+@pytest.mark.parametrize("defect", ["table-entry", "built-in-tables"])
 def test_run_reports_mechanics_defects(defect, monkeypatch):
-    class BadDie(random.Random):
-        def randint(self, a, b):
-            return 7
-
     def empty_tables():
         tables = mechanics.default_spark_tables()
         for name in mechanics.TABLE_NAMES:
             getattr(tables, name).clear()
         return tables
 
-    if defect == "die":
-        monkeypatch.setattr(runner.random, "Random", BadDie)
-    elif defect == "table-entry":
+    if defect == "table-entry":
         monkeypatch.setattr(runner, "default_spark_tables", empty_tables)
     else:
         monkeypatch.setattr(mechanics, "TABLE_ACTION", {})

@@ -302,7 +302,7 @@ def test_seeded_runs_are_reproducible(seed):
             ).model_dump(mode="json")
         )
     assert results[0] == results[1] == results[2]
-    # One stream feeds the whole run, so turns must not repeat the first turn's draws.
+    # One stream feeds the whole run, so its turns must not all share the same draws.
     draws = {
         (
             record["proposal"]["posture_roll"],

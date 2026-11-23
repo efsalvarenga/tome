@@ -14,7 +14,7 @@ from tome.engine.models import (
 
 
 class ProposalGenerator(Protocol):
-    """Drafts the active actor's proposal; each supporting pro must cite a canon fact."""
+    """Drafts the active actor's proposal; uncited pros are pruned, and one must cite canon."""
 
     def __call__(
         self,
