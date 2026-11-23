@@ -68,13 +68,14 @@ TOME combines **Chris Engle's Matrix Games** with **Cezar Capacle's Triple-O fra
 The engine is a library with one entry point:
 
 ```text
-run(request, proposal_generator, peer_reviewer, failure_resolver, umpire_review=None) -> RunResult
+run(request, proposal_generator, peer_reviewer, failure_resolver, umpire_review=None) -> RunResult  # or raises RunError
 ```
 
 * **Input:** a complete world state, a number of turns, and optional spark tables, first-round order, and random seed.
 * **Callables:** the caller supplies the proposal generator and peer reviewer (typically wrapping an LLM) and the umpire's failure resolver; the pre-roll umpire review is optional.
 * **Output:** the final world state and one audit record per turn.
-* **Guarantees:** the input is never mutated, a failed run returns no partial result, and a seeded run reproduces every engine-controlled draw.
+* **Failure:** a failed run raises a `RunError` subclass and publishes no partial result; `RunError.to_failure()` gives the serialisable `RunFailure`.
+* **Guarantees:** the input is never mutated, and a seeded run reproduces every engine-controlled draw.
 * **Caller's responsibility:** transport, authorisation, persistence, and presentation.
 
 See the [specification](docs/designs/001_tome_core_architecture.md) for the full contract, invariants, and test requirements.
@@ -85,38 +86,10 @@ See the [specification](docs/designs/001_tome_core_architecture.md) for the full
 
 ```text
 tome/
-├── docs/
-│   ├── designs/            # EGM design specifications
-│   │   └── 001_tome_core_architecture.md
-│   ├── plans/              # Approved implementation plans
-│   │   └── 001_tome_core_architecture_plan.md
-│   └── reviews/            # Zero-context Goldfish reviews
-│       ├── 001_tome_core_architecture_review.md
-│       └── 001_tome_core_architecture_egm/  # EGM workflow records
-├── scripts/
-│   └── lint.sh             # Locked verification gate
-├── src/
-│   └── tome/               # Simulation engine (Spec 1.1.2)
-│       ├── __init__.py     # Package entry point, version, and public API
-│       ├── tables.py       # Default d66 spark tables (Triple-O template)
-│       └── engine/
-│           ├── __init__.py # Public engine API
-│           ├── errors.py   # Stable failure types
-│           ├── text.py     # Narrative text matching
-│           ├── models.py   # Strict Pydantic v2 contract models
-│           ├── mechanics.py  # Seeded dice and spark draws
-│           ├── gates.py    # Grounding and callback validation
-│           ├── protocols.py  # Caller-supplied callback contracts
-│           └── runner.py   # Atomic turn orchestration
-├── tests/
-│   ├── support.py          # Shared deterministic test helpers
-│   ├── test_tome_core.py   # Contract and mechanics unit tests
-│   └── test_tome_integration.py  # End-to-end contract tests
-├── .python-version         # Python 3.11 interpreter pin
-├── uv.lock                 # Locked runtime and development dependencies
-├── AGENTS.md               # Repository conventions for agents
-├── pyproject.toml          # Project metadata, dependencies, and tooling
-└── LICENSE                 # Dual MIT and CC BY-SA 4.0 licences
+├── docs/       # Design specifications, implementation plans, and EGM review records
+├── scripts/    # lint.sh, the locked verification gate
+├── src/tome/   # Engine package; `tome` re-exports the public API from `tome.engine`
+└── tests/      # Contract, mechanics, and end-to-end tests
 ```
 
 ---

@@ -12,8 +12,7 @@ This document specifies repository calibration, architectural invariants, and ag
 * **Parent Concept:** Integrates **Chris Engle Matrix Games** (structured argumentation and probability resolution under uncertainty) with **Cezar Capacle's Triple-O framework** (the Obvious / Option / Odd tier and d66 spark tables for divergent narrative cues).
 * **Authoritative Design:** [`docs/designs/001_tome_core_architecture.md`](docs/designs/001_tome_core_architecture.md) defines the mechanics and the interface contract.
   Where this file and the specification differ, the specification wins.
-* **State Flow:** The engine is a library with one entry point, `run(request, proposal_generator, peer_reviewer, failure_resolver, umpire_review=None)`:
-  $$\mathcal{M}(\text{WorldState}_{t}, \text{RunRequest}) \longrightarrow (\text{WorldState}_{t+n}, \text{TurnRecord}_{1..n})$$
+* **State Flow:** The engine is a library with one entry point, `run`; its signature and guarantees are in the README's [Execution Contract](README.md#execution-contract).
 * **Core Philosophy:**
   1. *Deterministic Mechanical Core:* Pure Python handles the posture die, spark-table draws, vote validation, and 2d6 resolution without network or LLM dependencies; a supplied seed reproduces every engine-controlled draw.
   2. *Strict Epistemic Grounding:* Supporting arguments and vote shifts must cite existing canon facts; the human umpire may additionally reject illogical vote shifts.
