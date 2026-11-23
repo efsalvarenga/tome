@@ -12,8 +12,7 @@ This document specifies repository calibration, architectural invariants, and ag
 * **Parent Concept:** Integrates **Chris Engle Matrix Games** (structured argumentation and probability resolution under uncertainty) with **Cezar Capacle's Triple-O framework** (the Obvious / Option / Odd tier and d66 spark tables for divergent narrative cues).
 * **Authoritative Design:** [`docs/designs/001_tome_core_architecture.md`](docs/designs/001_tome_core_architecture.md) defines the mechanics and the interface contract.
   Where this file and the specification differ, the specification wins.
-* **State Flow:** The engine is a library with one entry point, `run(request, proposal_generator, peer_reviewer, failure_resolver, umpire_review=None)`:
-  $$\mathcal{M}(\text{WorldState}_{t}, \text{RunRequest}) \longrightarrow (\text{WorldState}_{t+n}, \text{TurnRecord}_{1..n})$$
+* **State Flow:** The engine is a library with one entry point, `run`; its signature and guarantees are in the README's [Execution Contract](README.md#execution-contract).
 * **Core Philosophy:**
   1. *Deterministic Mechanical Core:* Pure Python handles the posture die, spark-table draws, vote validation, and 2d6 resolution without network or LLM dependencies; a supplied seed reproduces every engine-controlled draw.
   2. *Strict Epistemic Grounding:* Supporting arguments and vote shifts must cite existing canon facts; the human umpire may additionally reject illogical vote shifts.
@@ -27,7 +26,14 @@ This document specifies repository calibration, architectural invariants, and ag
 * All major architectural features, schema changes, and engine stages must adhere to the **Elephant-Goldfish Model (EGM)**:
   * Specifications live in `docs/designs/<NNN>_<feature_slug>.md` using the EGM design template.
   * Zero-context adversarial critiques live in `docs/reviews/<NNN>_<feature_slug>_review.md`.
-  * Specifications must pass `validate_egm.py` before core production implementation commences.
+  * Before core production implementation commences, a specification must pass an EGM review, run with the `egm-review` or `egm-review-loop` skill of the upstream `elephant-goldfish-model` plugin, and record `Status: Approved` with the human developer's sign-off.
+  * Implementation plans live in `docs/plans/<NNN>_<feature_slug>_plan.md`.
+    A plan implements an approved specification without restating it.
+    Plans stay out of `docs/designs/`, which holds only specifications.
+  * EGM workflow records, including implementation-readiness reviews of plans, live under `docs/reviews/<NNN>_<feature_slug>_egm/`.
+    Commit only the summary records that a specification or plan links to, such as the consolidated, Goldfish, review-loop, and implementation-readiness reports.
+    Remove intermediate working records, such as critic, comprehension, and zoom-out reports and per-round reports, before merge, and repoint links to them at a permanent GitHub link to the last commit that contains them.
+    Keep exactly one top-level review file, `docs/reviews/<NNN>_<feature_slug>_review.md`, per specification, and put every other record under the `_egm/` directory.
 * **Strict No-Code Rule during Elephant Drafting:** Design specifications focus on contracts, state schemas, invariants, and edge cases before code is written.
 * **One Sentence per Line:** In Markdown prose, write each sentence on its own source line for cleaner diffs; code blocks, tables, and headings are exempt.
 
@@ -35,6 +41,9 @@ This document specifies repository calibration, architectural invariants, and ag
 
 * **Language & Runtime:** Python 3.11+
 * **Package & Environment Management:** `uv` (`pyproject.toml`)
+* **Verification:** `./scripts/lint.sh` is the green-baseline gate.
+  Commit `uv.lock` and refresh it with `uv lock` when dependencies change.
+  `.python-version` pins Python 3.11 for the golden vectors.
 * **Core Libraries:**
   * `pydantic` (v2) for strict runtime schema validation and serialization.
   * `pytest` for deterministic mechanical test suites.

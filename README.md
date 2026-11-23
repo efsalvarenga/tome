@@ -11,8 +11,8 @@ It is scenario-agnostic: the caller supplies the actors, the established facts, 
 
 $$\mathcal{M}(\text{WorldState}_{t}, \text{RunRequest}) \longrightarrow (\text{WorldState}_{t+n}, \text{TurnRecord}_{1..n})$$
 
-> **Status:** The [core architecture specification](docs/designs/001_tome_core_architecture.md) (Spec 1.1.1, Interface Contract 1.1.0) is approved.
-> The code in `src/tome/` still implements an earlier design and is being rewritten to match it.
+> **Status:** `src/tome/` implements Spec 1.1.2 (Interface Contract 1.1.0).
+> It is checked by tests derived from Section 7 of the [specification](docs/designs/001_tome_core_architecture.md).
 
 ---
 
@@ -71,10 +71,11 @@ The engine is a library with one entry point:
 run(request, proposal_generator, peer_reviewer, failure_resolver, umpire_review=None) -> RunResult
 ```
 
-* **Input:** a complete world state, a number of turns, and optional spark tables, first-round order, and random seed.
+* **Input:** `contract_version: "1.1.0"`, a complete world state, a number of turns, and optional spark tables, first-round order, and random seed.
 * **Callables:** the caller supplies the proposal generator and peer reviewer (typically wrapping an LLM) and the umpire's failure resolver; the pre-roll umpire review is optional.
 * **Output:** the final world state and one audit record per turn.
-* **Guarantees:** the input is never mutated, a failed run returns no partial result, and a seeded run reproduces every engine-controlled draw.
+* **Failure:** a failed run raises a `RunError` subclass and publishes no partial result; `RunError.to_failure()` gives the serialisable `RunFailure`.
+* **Guarantees:** the input is never mutated, and a seeded run reproduces every engine-controlled draw.
 * **Caller's responsibility:** transport, authorisation, persistence, and presentation.
 
 See the [specification](docs/designs/001_tome_core_architecture.md) for the full contract, invariants, and test requirements.
@@ -85,24 +86,10 @@ See the [specification](docs/designs/001_tome_core_architecture.md) for the full
 
 ```text
 tome/
-├── docs/
-│   ├── designs/            # EGM design specifications
-│   │   └── 001_tome_core_architecture.md
-│   └── reviews/            # Zero-context Goldfish reviews
-│       └── 001_tome_core_architecture_review.md
-├── src/
-│   └── tome/               # Simulation engine (being rewritten to Spec 1.1.1)
-│       ├── __init__.py     # Package entry point and version
-│       ├── dice.py         # Dice mechanics
-│       ├── models.py       # Pydantic v2 schemas
-│       ├── runner.py       # Turn orchestration
-│       ├── tables.py       # Default d66 spark tables (Triple-O template)
-│       └── validator.py    # Grounding and adjudication rules
-├── tests/
-│   └── test_tome_core.py   # Deterministic test suite
-├── AGENTS.md               # Repository conventions for agents
-├── pyproject.toml          # Project metadata, dependencies, and tooling
-└── LICENSE                 # Dual MIT and CC BY-SA 4.0 licences
+├── docs/       # Design specifications, implementation plans, and EGM review records
+├── scripts/    # lint.sh, the locked verification gate
+├── src/tome/   # Engine package; `tome` re-exports the public API from `tome.engine`
+└── tests/      # Contract, mechanics, and end-to-end tests
 ```
 
 ---
@@ -112,7 +99,7 @@ tome/
 ### Prerequisites
 
 * Python 3.11 or later
-* [`uv`](https://docs.astral.sh/uv/) (recommended) or standard `pip`
+* [`uv`](https://docs.astral.sh/uv/) is required for the verification gate
 
 ### Setup
 
@@ -120,26 +107,19 @@ tome/
 git clone https://github.com/efsalvarenga/tome.git
 cd tome
 
-# Create and activate a virtual environment with uv
-uv venv
-source .venv/bin/activate
-
 # Install the package in editable mode with development dependencies
-uv pip install -e ".[dev]"
+uv sync --locked --extra dev
 ```
 
-### Running the Test Suite
+### Verification
+
+The verification gate runs Ruff lint, the Ruff format check, and pytest using the committed lockfile.
 
 ```bash
-pytest
+./scripts/lint.sh
 ```
 
-### Formatting & Static Analysis
-
-```bash
-ruff check .
-ruff format --check .
-```
+Users of `pip` can still install with `pip install -e ".[dev]"` and run `ruff check .`, `ruff format --check .`, and `pytest` directly.
 
 ---
 
