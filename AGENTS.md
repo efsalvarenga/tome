@@ -26,14 +26,14 @@ This document specifies repository calibration, architectural invariants, and ag
 * All major architectural features, schema changes, and engine stages must adhere to the **Elephant-Goldfish Model (EGM)**:
   * Specifications live in `docs/designs/<NNN>_<feature_slug>.md` using the EGM design template.
   * Zero-context adversarial critiques live in `docs/reviews/<NNN>_<feature_slug>_review.md`.
-  * Specifications must pass `validate_egm.py` before core production implementation commences.
+  * Before core production implementation commences, a specification must pass an EGM review, run with the `egm-review` or `egm-review-loop` skill of the upstream `elephant-goldfish-model` plugin, and record `Status: Approved` with the human developer's sign-off.
   * Implementation plans live in `docs/plans/<NNN>_<feature_slug>_plan.md`.
     A plan implements an approved specification without restating it.
-    Plans stay out of `docs/designs/`, because `validate_egm.py` treats every file there as a specification.
+    Plans stay out of `docs/designs/`, which holds only specifications.
   * EGM workflow records, including implementation-readiness reviews of plans, live under `docs/reviews/<NNN>_<feature_slug>_egm/`.
     Commit only the summary records that a specification or plan links to, such as the consolidated, Goldfish, review-loop, and implementation-readiness reports.
     Remove intermediate working records, such as critic, comprehension, and zoom-out reports and per-round reports, before merge, and repoint links to them at a permanent GitHub link to the last commit that contains them.
-    Do not add other top-level `docs/reviews/<NNN>_*.md` files, because `validate_egm.py` reads the first top-level match as the specification's review.
+    Keep exactly one top-level review file, `docs/reviews/<NNN>_<feature_slug>_review.md`, per specification, and put every other record under the `_egm/` directory.
 * **Strict No-Code Rule during Elephant Drafting:** Design specifications focus on contracts, state schemas, invariants, and edge cases before code is written.
 * **One Sentence per Line:** In Markdown prose, write each sentence on its own source line for cleaner diffs; code blocks, tables, and headings are exempt.
 

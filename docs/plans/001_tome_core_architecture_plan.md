@@ -549,6 +549,7 @@ Items 1 to 5 and 7 change no engine behaviour; item 6 records where A1 departs f
 2.  **Specification gate (Phase 1 step 0, Verification Plan):** no commit records a run of `validate_egm.py`.
     The validator was removed from the shared tooling on 2026-11-17, when EGM moved to an upstream plugin that ships no equivalent, so the gate cannot be re-run.
     The specification is byte-identical to its approved state: `git diff --exit-code 32a4813 -- docs/designs/001_tome_core_architecture.md` exits 0.
+    `AGENTS.md` now names the EGM review skills and the human developer's sign-off as the specification gate instead of `validate_egm.py`.
 3.  **File Boundary exception:** Amendments A1 and A2 were added, and EGM review records were edited, outside the EGM review workflow, at the human developer's direction on 2026-11-23.
     The record edits are editorial only: six machine-specific paths became plugin-relative, two of them in `comprehension_report.md` and `zoom_out_report.md`, which lie outside the exception's `implementation_readiness/` directory, and ten headings gained their missing blank line.
     No finding, verdict, or round outcome changed.
