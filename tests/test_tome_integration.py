@@ -285,9 +285,10 @@ def test_input_unchanged_on_success_and_failure(base_roll):
     assert request == before
 
 
-def test_seeded_runs_are_reproducible():
+@pytest.mark.parametrize("seed", [0, 42])
+def test_seeded_runs_are_reproducible(seed):
     request = make_request(
-        world=make_world(("actor_c", "actor_a", "actor_b")), turn_count=10, seed=42
+        world=make_world(("actor_c", "actor_a", "actor_b")), turn_count=10, seed=seed
     )
     results = []
     for _ in range(3):
@@ -301,3 +302,13 @@ def test_seeded_runs_are_reproducible():
             ).model_dump(mode="json")
         )
     assert results[0] == results[1] == results[2]
+    # One stream feeds the whole run, so turns must not repeat the first turn's draws.
+    draws = {
+        (
+            record["proposal"]["posture_roll"],
+            tuple(record["proposal"]["spark_tags"]),
+            record["resolution_roll"],
+        )
+        for record in results[0]["turn_records"]
+    }
+    assert len(draws) > 1
