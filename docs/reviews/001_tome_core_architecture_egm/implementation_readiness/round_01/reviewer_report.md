@@ -285,7 +285,7 @@ The SHA-256 matched `677122ed…a8ef`. I audited lines 15–475 and found 7 Majo
 **One sentence per source line:** No violations in the target range. Tables, code and headings were excluded.
 
 **Files read**
-- `/Users/Estevao.alvarenga/.vscode/agent-plugins/github.com/google/elephant-goldfish-model/agents/style.md`
+- `elephant-goldfish-model/agents/style.md`
 - `docs/plans/001_tome_core_architecture_plan.md` (whole file)
 - `docs/designs/001_tome_core_architecture.md` (headings, Section 2.8, Edge Case 6, Invariants 14 and 15, Sections 3.4, 3.5 and 7)
 - `AGENTS.md`, `pyproject.toml`

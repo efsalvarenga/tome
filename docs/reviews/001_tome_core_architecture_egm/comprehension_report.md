@@ -50,7 +50,7 @@ There were no Blocker findings.
 
 Files actually read:
 
-- Official plugin `agents/comprehension.md` under `/Users/Estevao.alvarenga/.vscode/agent-plugins/github.com/google/elephant-goldfish-model/`.
+- Official plugin `agents/comprehension.md` under `elephant-goldfish-model/`.
 - [Specification](../../designs/001_tome_core_architecture.md): Complete assigned lines 1-1052, with truncated reads completed.
 
 **Limitations:** Document-only review.

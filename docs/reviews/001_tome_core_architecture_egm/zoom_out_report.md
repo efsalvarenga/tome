@@ -99,7 +99,7 @@ Official plugin files read:
 - `agents/zoom_out.md`
 - `resources/document_standards/zoom-out-standard.md`
 
-Both are under `/Users/Estevao.alvarenga/.vscode/agent-plugins/github.com/google/elephant-goldfish-model/`.
+Both are under `elephant-goldfish-model/`.
 
 Repository files read or searched:
 

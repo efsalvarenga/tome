@@ -109,6 +109,7 @@ Status: completed
 - **Impact:** low. Either form would fail at import after the deletions, so the pytest gate would catch it. The grep alone is not a complete check, though.
 
 ### Verified as accurate
+
 - **Branch and commit:** branch `feat/trio-engine-1.1`, HEAD `7d3fef1`.
 - **Legacy design features exist:**
   - d4/d6/d8 posture dice in `dice.py`;
@@ -135,6 +136,7 @@ Status: completed
 - **Reuse:** nothing in the legacy code should be reused that the plan misses. `sanitize_anchor_string` is legacy and is deleted.
 
 ### Files read
+
 - The persona and the standard.
 - The plan, in full.
 - The spec: selected sections (lines 1028–1112) plus targeted greps.
@@ -144,6 +146,7 @@ Status: completed
 - Directory listings.
 
 ### Limitations
+
 - I did not run tests, Ruff, `uv` or the validator, so these were not checked:
   - the Pydantic 2.14.3 and pass/fail baseline claims;
   - pytest's default import mode under the version `uv lock` will choose;

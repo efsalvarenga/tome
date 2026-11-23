@@ -84,6 +84,7 @@ Status: completed
 **Suggested fix:** State that the format check covers Markdown files, or record the locked Ruff version. Changing `pyproject.toml` is out of scope.
 
 ### Claims confirmed against the repository
+
 - **Branch and baseline commit:** the branch is `feat/trio-engine-1.1` and HEAD is `7d3fef1`. `AGENTS.md` has the uncommitted `docs/plans/` convention, so the Phase 0 step 0 precondition is not met yet. That is consistent with the plan.
 - **Files that do not exist yet:** `uv.lock`, `.python-version`, `scripts/` and `.github/`. `tests/` has no `__init__.py` or `conftest.py`.
 - **Legacy engine:** the 4 legacy modules, `tests/test_tome_core.py` and its 8 tests exist as described. The legacy code covers step-dice postures, traits and exhaustion, outcome bands, `active_rumors` and urgency sorting.
@@ -105,6 +106,7 @@ Status: completed
 - **Reuse:** I found no missed reuse. Legacy `validator.sanitize_anchor_string` has different rules from spec Section 3.0 and is deleted in Phase 5, so not reusing it is correct.
 
 ### Files read
+
 - The plan, lines 1–505.
 - The persona file and the standard.
 - Spec lines 520–600 and 840–1110, plus searches through the rest.
@@ -113,6 +115,7 @@ Status: completed
 - `pyproject.toml`, `README.md`, `.gitignore`, and the `AGENTS.md` diff (the injected AGENTS.md also served as context).
 
 ### Limitations
+
 - I did not run pytest or Pydantic. The claims that the 8 legacy tests pass with Pydantic 2.14.3, the Pydantic behaviours, and the `uv lock`/`uv sync` results are unverified.
 - I did not read inside `docs/reviews/`. I only listed file paths through Ruff's verbose output.
 
@@ -186,7 +189,7 @@ Status: completed
 - **Worked example and golden vectors:** seed 20 and the override entries match spec lines 371–379, 568–571, 596 and 662. The Invariant 14 vectors match spec lines 898–901.
 
 **Files read**
-- Persona: `/Users/Estevao.alvarenga/.vscode/agent-plugins/github.com/google/elephant-goldfish-model/agents/style.md`
+- Persona: `elephant-goldfish-model/agents/style.md`
 - Target: `docs/plans/001_tome_core_architecture_plan.md` (SHA-256 matches `beadbc1e…aad`)
 - `docs/designs/001_tome_core_architecture.md` (selected sections)
 - `README.md`, `pyproject.toml`

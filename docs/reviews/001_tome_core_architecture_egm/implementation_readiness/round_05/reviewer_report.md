@@ -58,7 +58,7 @@ Checks against the standard:
 - **Guidance:** Add one sentence to the line-501 row or to line 414. For example: "replace `tome.engine.runner.roll_resolution` with a function returning `(4, 4)` then `(1, 1)`, so turn 1 succeeds and turn 2 fails". Alternatively, extend `seed_for_base_roll` to take a sequence of per-turn targets for a supplied-order run.
 
 **Files read**
-- `agents/implementation_readiness.md` (persona) and `resources/document_standards/implementation-readiness-standard.md` (standard), both under `/Users/Estevao.alvarenga/.vscode/agent-plugins/github.com/google/elephant-goldfish-model/`.
+- `agents/implementation_readiness.md` (persona) and `resources/document_standards/implementation-readiness-standard.md` (standard), both under `elephant-goldfish-model/`.
 - The target plan, lines 1–506, read in full in chunks, with every truncation completed.
 - `docs/designs/001_tome_core_architecture.md`, lines 1–1123.
 - `pyproject.toml`, `README.md`, `src/tome/__init__.py`, and the start and table names of `src/tome/tables.py`.
@@ -181,7 +181,7 @@ Status: completed
 - No breaches of the one-sentence-per-line rule were found in prose; the apparent hits were list numbering.
 
 **Files read**
-- `/Users/Estevao.alvarenga/.vscode/agent-plugins/github.com/google/elephant-goldfish-model/agents/style.md`
+- `elephant-goldfish-model/agents/style.md`
 - The target plan, lines 1–506; its SHA-256 matched.
 - From the context: targeted sections of `docs/designs/001_tome_core_architecture.md`, `pyproject.toml`, `README.md`, and import lines in `src/` and `tests/` (via `git grep`).
 

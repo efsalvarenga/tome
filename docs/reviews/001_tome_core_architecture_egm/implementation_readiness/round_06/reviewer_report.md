@@ -158,6 +158,7 @@ Status: completed
 - There is no missed reuse. `validator.sanitize_anchor_string` is legacy, is deleted in Phase 5, and differs from Section 3.0 on the one-character quote case.
 
 ### Files read
+
 - The plan (full)
 - The persona and the standard
 - `pyproject.toml`, `.gitignore`, `README.md`, `AGENTS.md` (plus its working-tree diff)
@@ -168,6 +169,7 @@ Status: completed
 - Spec sections 2.0–2.4, 3.4 (example) and 3.5, plus targeted greps of the spec
 
 ### Limitations
+
 - As instructed, I did not run tests, Ruff or uv.
 - I could not verify these claims: Pydantic 2.14.3 behaviour, Ruff 0.17.5 Markdown formatting, the golden-vector draw values, the legacy tests passing, the Hatchling editable build, and `validate_egm.py` exiting 0.
 - I did not read `docs/reviews/`, so I could not confirm whether those records contain `python` fences (finding codebase_details-6-1).
@@ -248,6 +250,7 @@ Status: completed
 - **Action:** Add "`voter_actor_id` `voter_actor.id`," at the start of the list.
 
 ### Files read
+
 - The style persona: `.../elephant-goldfish-model/agents/style.md`.
 - The target plan, lines 1–508.
 - `docs/designs/001_tome_core_architecture.md`: Sections 2.8, 3.4 (worked-example tables), 3.5, 4 (Invariants 14 and 15), 6 and 7.
@@ -258,6 +261,7 @@ Status: completed
 - `tests/test_tome_core.py`, for the test count and legacy imports.
 
 ### Limitations
+
 - I did not run Ruff, `uv` or pytest. Claims about Ruff and Pydantic behaviour were checked only against the plan's own Starting Baseline.
 - I ran `git grep` (read-only) to confirm the 9 matching lines and the `\b` behaviour.
 - I did not read `docs/reviews/`.
