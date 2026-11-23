@@ -44,8 +44,8 @@ The plan records these as author decisions; reviewers may report their consequen
 ### Round 1
 
 - Input SHA-256: `677122edc137a7e1f642f3899a265610b3f0a33614273919ad0b2ef3c4d1a8ef`.
-- [Complete reviewer reports](round_01/reviewer_report.md).
-- [Annotated resolution proposals](round_01/goldfish_review_report.md).
+- [Complete reviewer reports](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/implementation_readiness/round_01/reviewer_report.md).
+- [Annotated resolution proposals](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/implementation_readiness/round_01/goldfish_review_report.md).
 - All 30 findings are PROPOSE FIX, grouped into 20 edit groups; none reopens a settled decision.
 - The coordinator probed five behaviours the findings depend on; one reviewer claim, that a star import fails Ruff F403 under the repository settings, was not confirmed, but the proposed literal-export fix stands.
 - No plan edit was made before the human decision.
@@ -57,8 +57,8 @@ The plan records these as author decisions; reviewers may report their consequen
 
 - The user confirmed continuing on 2026-11-18, after a restart; the plan and records were unchanged.
 - Input SHA-256: `6c28bf0617aabdd989d4de1e3ef237e9bf474aa0bdbbf50f9256b7241713631b`.
-- [Complete reviewer reports](round_02/reviewer_report.md).
-- [Annotated resolution proposals](round_02/goldfish_review_report.md).
+- [Complete reviewer reports](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/implementation_readiness/round_02/reviewer_report.md).
+- [Annotated resolution proposals](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/implementation_readiness/round_02/goldfish_review_report.md).
 - The implementation-readiness reviewer found no Blocker or Major.
 - All 19 findings are PROPOSE FIX, grouped into 14 edit groups; none reopens a settled decision and none is churn.
 - The coordinator confirmed the baseline-command defect, found the Ruff star-import attribution wrong, and verified the seed-20 worked example.
@@ -69,8 +69,8 @@ The plan records these as author decisions; reviewers may report their consequen
 
 - The user confirmed round 3 after round-two resolution.
 - Input SHA-256: `afd65538a48727343205668a8c3fc6c5d9ce13ab176b508993535c417f5c3a00`.
-- [Complete reviewer reports](round_03/reviewer_report.md).
-- [Annotated resolution proposals](round_03/goldfish_review_report.md).
+- [Complete reviewer reports](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/implementation_readiness/round_03/reviewer_report.md).
+- [Annotated resolution proposals](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/implementation_readiness/round_03/goldfish_review_report.md).
 - The implementation-readiness and codebase-details reviewers found no Blocker or Major; the style reviewer found 2 Majors.
 - All 17 findings are PROPOSE FIX, grouped into 15 edit groups; none reopens a settled decision and none is churn.
 - The coordinator verified the Hatchling build and gate in a temporary copy of the repository, and the validator on the default `python3`.
@@ -83,8 +83,8 @@ The plan records these as author decisions; reviewers may report their consequen
 
 - The user confirmed round 4 after round-three resolution.
 - Input SHA-256: `beadbc1e5e7ce6c7b59a8e3107d3ad4714faf49edad5ae9aa87d64e9fac39aad`.
-- [Complete reviewer reports](round_04/reviewer_report.md).
-- [Annotated resolution proposals](round_04/goldfish_review_report.md).
+- [Complete reviewer reports](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/implementation_readiness/round_04/reviewer_report.md).
+- [Annotated resolution proposals](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/implementation_readiness/round_04/goldfish_review_report.md).
 - The implementation-readiness reviewer judged the plan ready to implement; it and the codebase-details reviewer found no Blocker or Major.
 - The style reviewer found one Major: the source of `TurnRecord.session_index` on round-ending turns was ambiguous and untested.
 - All 12 findings are PROPOSE FIX, grouped into 12 edit groups; none reopens a settled decision and none is churn.
@@ -97,8 +97,8 @@ The plan records these as author decisions; reviewers may report their consequen
 
 - The user confirmed round 5 as the final round.
 - Input SHA-256: `713caa27483e578bfa27cbd559627e72fd01d5efe72f488ba672176f6115a20b`.
-- [Complete reviewer reports](round_05/reviewer_report.md).
-- [Annotated resolution proposals](round_05/goldfish_review_report.md).
+- [Complete reviewer reports](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/implementation_readiness/round_05/reviewer_report.md).
+- [Annotated resolution proposals](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/implementation_readiness/round_05/goldfish_review_report.md).
 - The codebase-details reviewer reported no findings; the implementation-readiness reviewer reported one Nit; the style reviewer reported 2 Majors and 4 Nits.
 - All 7 findings are PROPOSE FIX, grouped into 7 edit groups; none reopens a settled decision and none is churn.
 - The coordinator verified that the locked Ruff is 0.17.5 and that its format check covers Markdown without editing files.
@@ -111,8 +111,8 @@ The plan records these as author decisions; reviewers may report their consequen
 
 - The human chose to continue past the cap; round 6 is the first round beyond it.
 - Input SHA-256: `5ab721dd7e7a20d0c7bebcd22e58c4426bf43f7f3bd4063b650c41fc6b7a5281`.
-- [Complete reviewer reports](round_06/reviewer_report.md).
-- [Annotated resolution proposals](round_06/goldfish_review_report.md).
+- [Complete reviewer reports](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/implementation_readiness/round_06/reviewer_report.md).
+- [Annotated resolution proposals](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/implementation_readiness/round_06/goldfish_review_report.md).
 - The implementation-readiness reviewer judged the plan ready to implement, with no Blocker or Major.
 - Majors: committed review-record Markdown is format-checked without a failure instruction, and the D12 narrowed-passage list omitted two passages.
 - All 15 findings are PROPOSE FIX, grouped into 14 edit groups; none reopens a settled decision and none is churn.

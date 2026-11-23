@@ -44,7 +44,7 @@ This resolution does not claim that output growth has been eliminated.
 
 ### egm-design-1-1 [egm-design] - Severity: Blocker
 
-* **Affected Scope:** Sections 1-5, original lines 29-905; [source report](critic_report.md).
+* **Affected Scope:** Sections 1-5, original lines 29-905; [source report](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/critic_report.md).
 * **Discrepancy Description:** The overview names avoided approaches, and the changelog records replaced mechanics, but neither evaluates viable alternatives with concrete rejection reasons.
 * **Rationale:** Consequently, the document does not satisfy the standard's mandatory Alternatives Rule.
 * ***AI Suggestion:*** PROPOSE FIX
@@ -56,7 +56,7 @@ This resolution does not claim that output growth has been eliminated.
 
 ### egm-structural-1-1 [egm-structural] - Severity: Blocker
 
-* **Affected Scope:** Changelog and Section 1, original lines 17-64; [source report](critic_report.md).
+* **Affected Scope:** Changelog and Section 1, original lines 17-64; [source report](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/critic_report.md).
 * **Discrepancy Description:** The document records removed mechanics and deferred infrastructure, but does not explain their trade-offs against the selected design.
   Saying an option was removed, excluded, or deferred is not an evaluation.
 * **Rationale:** A fresh engineer can implement the chosen contract but cannot assess why consequential design choices are preferable.
@@ -68,7 +68,7 @@ This resolution does not claim that output growth has been eliminated.
 
 ### egm-zoom-out-1-1 [egm-zoom-out] - Severity: Major
 
-* **Affected Scope:** Invariants 1 and 12; Section 5; Edge Case 8; original lines 784-787, 818-822, 890-892, and 927-929; [source report](zoom_out_report.md).
+* **Affected Scope:** Invariants 1 and 12; Section 5; Edge Case 8; original lines 784-787, 818-822, 890-892, and 927-929; [source report](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/zoom_out_report.md).
 * **Discrepancy Description:** With two actors and supplied order `[A, B]`, one two-turn request executes A then B and completes a round.
   Two chained one-turn requests execute A twice and never advance `session_index`.
 * **Rationale:** A caller's batching choice becomes a domain rule controlling actor participation and simulated time.
@@ -85,7 +85,7 @@ This resolution does not claim that output growth has been eliminated.
 
 ### egm-zoom-out-1-2 [egm-zoom-out] - Severity: Major
 
-* **Affected Scope:** Sections 2.5 and 3.4, original lines 170-175, 411-416, and 634-637; [source report](zoom_out_report.md).
+* **Affected Scope:** Sections 2.5 and 3.4, original lines 170-175, 411-416, and 634-637; [source report](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/zoom_out_report.md).
 * **Discrepancy Description:** Each turn records the complete canon before and after appending one fact.
   For n turns starting with C facts, those snapshots alone contain `2nC + n^2` fact occurrences, although the run introduces only n facts.
 * **Rationale:** This is contract-mandated duplication, not a speculative performance concern requiring caching or benchmarks.
@@ -100,7 +100,7 @@ This resolution does not claim that output growth has been eliminated.
 
 ### egm-comprehension-1-1 [egm-comprehension] - Severity: Major
 
-* **Affected Scope:** Sections 2.3-2.5 and 3.1; Invariant 6; [source report](comprehension_report.md).
+* **Affected Scope:** Sections 2.3-2.5 and 3.1; Invariant 6; [source report](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/comprehension_report.md).
 * **Discrepancy Description:** Canon's interpretation when narrative conditions change is unclear.
 * **Rationale:** The document does not explain whether canon represents historical assertions or currently applicable truths, how superseded conditions should be interpreted, or who makes that determination.
 * ***AI Suggestion:*** PROPOSE FIX
@@ -113,7 +113,7 @@ This resolution does not claim that output growth has been eliminated.
 
 ### egm-design-1-2 [egm-design] - Severity: Major
 
-* **Affected Scope:** Sections 3.1 and 3.4; Invariant 11; Section 8; original lines 234, 371, 635-636, 815-818, and 1047; [source report](critic_report.md).
+* **Affected Scope:** Sections 3.1 and 3.4; Invariant 11; Section 8; original lines 234, 371, 635-636, 815-818, and 1047; [source report](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/critic_report.md).
 * **Discrepancy Description:** Every turn appends one canon fact, and every turn record contains complete before/after canon arrays.
   With C initial facts and T turns, those snapshots contain `2CT + T^2` fact occurrences in serialized output.
 * **Rationale:** Line 1047 acknowledges this as deferred, but supplies no workload assumptions, admission-control expectations, or mitigation.
@@ -127,7 +127,7 @@ This resolution does not claim that output growth has been eliminated.
 
 ### egm-structural-1-2 [egm-structural] - Severity: Major
 
-* **Affected Scope:** Sections 3.1, 3.4, and 8, original lines 234, 367-399, 633-636, and 1047; [source report](critic_report.md).
+* **Affected Scope:** Sections 3.1, 3.4, and 8, original lines 234, 367-399, 633-636, and 1047; [source report](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/critic_report.md).
 * **Discrepancy Description:** Strings have no maximum length; actor, canon, and turn counts have no documented operating envelope; every turn records complete before/after field values.
 * **Rationale:** Callers receive no guidance for avoiding excessive output, memory demand, or provider work.
 * ***AI Suggestion:*** PROPOSE FIX
@@ -139,7 +139,7 @@ This resolution does not claim that output growth has been eliminated.
 
 ### egm-structural-1-3 [egm-structural] - Severity: Major
 
-* **Affected Scope:** Sections 2.0 and 3.5, original lines 69-80 and 658-715; [source report](critic_report.md).
+* **Affected Scope:** Sections 2.0 and 3.5, original lines 69-80 and 658-715; [source report](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/critic_report.md).
 * **Discrepancy Description:** The architecture passes complete world state to caller-owned, potentially LLM-backed executable callables without identifying disclosure risks, adapter trust assumptions, or corresponding caller-owned controls.
 * **Rationale:** Isolated snapshots address mutation, not executable-code sandboxing or external disclosure.
 * ***AI Suggestion:*** PROPOSE FIX
@@ -151,7 +151,7 @@ This resolution does not claim that output growth has been eliminated.
 
 ### egm-style-1-1 [egm-style] - Severity: Major
 
-* **Affected Scope:** Section 3.4, original line 648; [source report](critic_report.md).
+* **Affected Scope:** Section 3.4, original line 648; [source report](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/critic_report.md).
 * **Discrepancy Description:** "Given the same inputs and umpire decisions, the engine produces the same `reason` text."
 * **Rationale:** This reproducibility promise omits the seed and adapter-output conditions stated elsewhere.
 * ***AI Suggestion:*** PROPOSE FIX
@@ -163,7 +163,7 @@ This resolution does not claim that output growth has been eliminated.
 
 ### egm-style-1-2 [egm-style] - Severity: Major
 
-* **Affected Scope:** Section 3.3, original line 343; [source report](critic_report.md).
+* **Affected Scope:** Section 3.3, original line 343; [source report](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/critic_report.md).
 * **Discrepancy Description:** "It is not rewritten if the shift is reverted; `umpire_rejections` records the reversion, and the umpire judges the argument's fit when resolving a failure."
 * **Rationale:** Invalid shifts can revert without producing such an entry.
   This overstates the audit record's specified coverage.
@@ -176,7 +176,7 @@ This resolution does not claim that output growth has been eliminated.
 
 ### egm-zoom-out-2-1 [egm-zoom-out] - Severity: Major
 
-* **Affected Scope:** Sections 3.1, 3.4, and 8; Invariant 11; original lines 234, 411-416, 633-650, 815-818, and 1047; [source report](intermediate_zoom_out_report.md).
+* **Affected Scope:** Sections 3.1, 3.4, and 8; Invariant 11; original lines 234, 411-416, 633-650, 815-818, and 1047; [source report](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/intermediate_zoom_out_report.md).
 * **Discrepancy Description:** Complete before/after canon arrays contain `2nC + n^2` fact occurrences for n turns starting with C facts.
 * **Rationale:** Full snapshots can simplify inspection of short runs, but their duplication is structural.
 * ***AI Suggestion:*** PROPOSE FIX
@@ -188,7 +188,7 @@ This resolution does not claim that output growth has been eliminated.
 
 ### egm-zoom-out-2-2 [egm-zoom-out] - Severity: Major
 
-* **Affected Scope:** Sections 2.3-2.6 and 3.1; Invariant 6; original lines 145, 170-199, 278-284, and 800-802; [source report](intermediate_zoom_out_report.md).
+* **Affected Scope:** Sections 2.3-2.6 and 3.1; Invariant 6; original lines 145, 170-199, 278-284, and 800-802; [source report](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/intermediate_zoom_out_report.md).
 * **Discrepancy Description:** After "Actor A has capability X" and "Actor A loses capability X" enter canon, both remain mechanically valid citation anchors.
 * **Rationale:** The missing element is semantic ownership, not necessarily a mechanical capability tracker or fact-status database.
 * ***AI Suggestion:*** PROPOSE FIX
@@ -199,7 +199,7 @@ This resolution does not claim that output growth has been eliminated.
 
 ### egm-zoom-out-1-3 [egm-zoom-out] - Severity: Nit
 
-* **Affected Scope:** Sections 2.4, 3.3, and 3.5, original lines 147-151, 330-337, 692-696, and 730; [source report](zoom_out_report.md).
+* **Affected Scope:** Sections 2.4, 3.3, and 3.5, original lines 147-151, 330-337, 692-696, and 730; [source report](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/zoom_out_report.md).
 * **Discrepancy Description:** A peer evaluation that otherwise meets the rules but omits `biased_shift_applied` fails schema validation and can abort the entire run, despite the engine ignoring the submitted flag and recomputing it.
 * **Rationale:** This required provider field creates additional malformed-output states without contributing information to adjudication.
 * ***AI Suggestion:*** DECLINE
@@ -212,7 +212,7 @@ This resolution does not claim that output growth has been eliminated.
 
 ### egm-inventive-catalyst-1-1 [egm-inventive-catalyst] - Severity: Nit
 
-* **Affected Scope:** Sections 3.4 and 8, original lines 635-636 and 1047; [source report](zoom_out_report.md).
+* **Affected Scope:** Sections 3.4 and 8, original lines 635-636 and 1047; [source report](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/zoom_out_report.md).
 * **Discrepancy Description:** Per-turn auditability is coupled to retaining complete before-and-after canon arrays.
 * **Rationale:** Internal structural sharing cannot reduce the required full-value JSON output.
 * ***AI Suggestion:*** DECLINE
@@ -225,7 +225,7 @@ This resolution does not claim that output growth has been eliminated.
 
 ### egm-comprehension-1-2 [egm-comprehension] - Severity: Nit
 
-* **Affected Scope:** Section 3.5, introductory callable-return rule and `UmpireReview` signature; [source report](comprehension_report.md).
+* **Affected Scope:** Section 3.5, introductory callable-return rule and `UmpireReview` signature; [source report](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/comprehension_report.md).
 * **Discrepancy Description:** The statement that "each callable returns a plain mapping or an equivalent model" conflicts with `UmpireReview`, which returns `UmpireRejection[]`, including `[]`.
 * **Rationale:** The signature and subsequent explanation make the intended list return understandable, but the blanket rule gives contradictory integration guidance.
 * ***AI Suggestion:*** PROPOSE FIX
@@ -236,7 +236,7 @@ This resolution does not claim that output growth has been eliminated.
 
 ### egm-structural-1-4 [egm-structural] - Severity: Nit
 
-* **Affected Scope:** Original lines 1, 13, and 21; [source report](critic_report.md).
+* **Affected Scope:** Original lines 1, 13, and 21; [source report](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/critic_report.md).
 * **Discrepancy Description:** The H1 title is followed by an H3 Changelog without an intervening H2.
 * **Rationale:** Heading-based navigation presents an incomplete hierarchy.
 * ***AI Suggestion:*** PROPOSE FIX
@@ -247,7 +247,7 @@ This resolution does not claim that output growth has been eliminated.
 
 ### egm-structural-1-5 [egm-structural] - Severity: Nit
 
-* **Affected Scope:** Section 5, original lines 873-889; [source report](critic_report.md).
+* **Affected Scope:** Section 5, original lines 873-889; [source report](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/critic_report.md).
 * **Discrepancy Description:** Substeps `a.` through `i.` are plain paragraph text, not Markdown ordered-list markers.
 * **Rationale:** The central execution sequence loses its intended visual step structure.
 * ***AI Suggestion:*** PROPOSE FIX
@@ -258,7 +258,7 @@ This resolution does not claim that output growth has been eliminated.
 
 ### egm-style-1-3 [egm-style] - Severity: Nit
 
-* **Affected Scope:** Section 1, original line 34; [source report](critic_report.md).
+* **Affected Scope:** Section 1, original line 34; [source report](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/critic_report.md).
 * **Discrepancy Description:** "without relying on conversational consensus, fixed utility equations, or ungrounded claims."
 * **Rationale:** The unqualified grounding phrase is broader than the stated gate: supporting pros and shifted votes require canon references, while proposals and failure consequences introduce new facts.
 * ***AI Suggestion:*** PROPOSE FIX
@@ -270,7 +270,7 @@ This resolution does not claim that output growth has been eliminated.
 
 ### egm-style-1-4 [egm-style] - Severity: Nit
 
-* **Affected Scope:** Changelog, original line 18; Section 8, original line 1050; metadata, original lines 7-9; [source report](critic_report.md).
+* **Affected Scope:** Changelog, original line 18; Section 8, original line 1050; metadata, original lines 7-9; [source report](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/critic_report.md).
 * **Discrepancy Description:** Historical drafting and completed approval are insufficiently time-labelled.
 * **Rationale:** The current metadata identifies approved Spec Version 1.1.1.
   The long changelog cell also repeats review chronology already presented in Section 8, making the status transition harder to follow.
@@ -284,7 +284,7 @@ This resolution does not claim that output growth has been eliminated.
 
 ### egm-style-1-5 [egm-style] - Severity: Nit
 
-* **Affected Scope:** Section 2.2, original line 119; [source report](critic_report.md).
+* **Affected Scope:** Section 2.2, original line 119; [source report](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/critic_report.md).
 * **Discrepancy Description:** "`d66` uses one-based senary (base-six) notation: two digits, each from 1 to 6, identify one of 36 table entries."
 * **Rationale:** Numeral-base terminology introduces an unnecessary encoding question where the contract specifies decimal-string or integer lookup keys.
 * ***AI Suggestion:*** PROPOSE FIX
@@ -296,7 +296,7 @@ This resolution does not claim that output growth has been eliminated.
 
 ### egm-zoom-out-2-3 [egm-zoom-out] - Severity: Nit
 
-* **Affected Scope:** Section 3.4, original line 648; [source report](intermediate_zoom_out_report.md).
+* **Affected Scope:** Section 3.4, original line 648; [source report](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/intermediate_zoom_out_report.md).
 * **Discrepancy Description:** "Given the same inputs and umpire decisions" promises identical reason text without the seed and adapter-output conditions specified elsewhere.
 * **Rationale:** The existing fixed vocabulary already provides deterministic classification of resolved changes.
 * ***AI Suggestion:*** PROPOSE FIX
@@ -307,7 +307,7 @@ This resolution does not claim that output growth has been eliminated.
 
 ### egm-zoom-out-2-4 [egm-zoom-out] - Severity: Nit
 
-* **Affected Scope:** Sections 2.4, 3.3, 3.4, and 3.5, original lines 147-152, 343, 624-626, and 740-746; [source report](intermediate_zoom_out_report.md).
+* **Affected Scope:** Sections 2.4, 3.3, 3.4, and 3.5, original lines 147-152, 343, 624-626, and 740-746; [source report](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/intermediate_zoom_out_report.md).
 * **Discrepancy Description:** The statement that `umpire_rejections` records "the reversion" includes mechanical reversions in ordinary reading.
 * **Rationale:** Correcting the description is simpler than adding raw-provider histories or a new mechanical-rejection logging subsystem.
 * ***AI Suggestion:*** PROPOSE FIX
@@ -318,7 +318,7 @@ This resolution does not claim that output growth has been eliminated.
 
 ### egm-zoom-out-2-5 [egm-zoom-out] - Severity: Nit
 
-* **Affected Scope:** Section 3.5, original lines 676, 707-712, and 738-739; [source report](intermediate_zoom_out_report.md).
+* **Affected Scope:** Section 3.5, original lines 676, 707-712, and 738-739; [source report](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/intermediate_zoom_out_report.md).
 * **Discrepancy Description:** "Each callable returns a plain mapping or an equivalent model" conflicts with `UmpireReview` returning a list, including `[]`.
 * **Rationale:** A universal result wrapper would add complexity solely to reconcile an inaccurate sentence.
 * ***AI Suggestion:*** PROPOSE FIX
@@ -329,7 +329,7 @@ This resolution does not claim that output growth has been eliminated.
 
 ### egm-zoom-out-2-6 [egm-zoom-out] - Severity: Nit
 
-* **Affected Scope:** Sections 2.0 and 3.5, original lines 69-80, 658-718, 733-735, and 748-752; [source report](intermediate_zoom_out_report.md).
+* **Affected Scope:** Sections 2.0 and 3.5, original lines 69-80, 658-718, 733-735, and 748-752; [source report](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/intermediate_zoom_out_report.md).
 * **Discrepancy Description:** Snapshot isolation protects mechanical state from mutation.
   It does not sandbox executable code or prevent a provider adapter from transmitting that state externally.
 * **Rationale:** This warrants boundary documentation, not authentication, deployment controls, or an in-engine sandbox.

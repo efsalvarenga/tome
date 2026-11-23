@@ -533,7 +533,7 @@ For every draw that `random.Random` can produce, none changes the result or erro
 ### Amendment A2: Delivery and Process Deviations (2026-11-23)
 
 This amendment records every remaining deviation from the plan as approved on 2026-11-18, for the human developer's final review before merge.
-Items 1 to 5 change no engine behaviour; item 6 records where A1 departs from the specification's wording.
+Items 1 to 5 and 7 change no engine behaviour; item 6 records where A1 departs from the specification's wording.
 
 1.  **Branch and commit identities (D17, Starting Baseline, Verification Plan):** the work was done on `feat/trio-engine-1.1` as D17 requires.
     PR #5 had already squash-merged that branch's earlier commits into `main` as `7c71a29`, so on 2026-11-23 the 13 later commits were rebased, with identical trees, onto `main` as `feat/spec-1.1.2-engine` for PR #12.
@@ -560,8 +560,12 @@ Items 1 to 5 change no engine behaviour; item 6 records where A1 departs from th
     Invariant 15 describes `MechanicsError` as signalling a die result, table lookup, or counter outside its defined range.
     After A1, the posture die and every table lookup are still checked, counters stay bounded by `WorldState` and `TurnRecord` validation, and the two resolution dice are bounded only through their sum.
     The specification text is unchanged; issue #13 tracks aligning it with D12 and with this narrowing.
+7.  **EGM working records removed:** at the human developer's direction on 2026-11-23, and outside the EGM review workflow, 22 intermediate records were removed from `docs/reviews/001_tome_core_architecture_egm/`.
+    They are the critic, comprehension, zoom-out, and intermediate zoom-out reports, and the 18 round reports under `review_loop/round_*/` and `implementation_readiness/round_*/`.
+    The five summary records that the specification and this plan link to are kept: `001_tome_core_architecture_review.md`, `consolidated_review_report.md`, `goldfish_review_report.md`, `review_loop/review_loop_report.md`, and `implementation_readiness/implementation_readiness_report.md`.
+    Their 49 links to removed records now point to permanent GitHub links at commit `88df7b6`, which stays reachable through PR #12 after a squash merge.
 
-At the PR #12 head, the Verification Plan checks against `32a4813` pass: contract preservation exits 0, `git diff --check` exits 0, the Phase 5 legacy-import search finds nothing, and the file-boundary listing shows only the table's files, this plan, and the records named in item 3.
+At the PR #12 head, the Verification Plan checks against `32a4813` pass: contract preservation exits 0, `git diff --check` exits 0, the Phase 5 legacy-import search finds nothing, and the file-boundary listing shows only the table's files, this plan, and the record changes described in items 3 and 7.
 
 --------------------------------------------------------------------------------
 

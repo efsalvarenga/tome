@@ -40,8 +40,8 @@ No production changes are authorized by review convergence alone.
 
 ### Round 1
 
-- [Complete reviewer reports](round_01/reviewer_report.md).
-- [Annotated resolution proposals](round_01/goldfish_review_report.md).
+- [Complete reviewer reports](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/review_loop/round_01/reviewer_report.md).
+- [Annotated resolution proposals](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/review_loop/round_01/goldfish_review_report.md).
 - Input target SHA-256: `580f4919c88ce2146f2f6b28e4fd25d1aa782d9cff3beeec1bfbe52b96ecf8cb`.
 - Design and structure found no issues under their assigned standards.
 - Style identified one new Major grounding-wording ambiguity and two local Nits.
@@ -59,8 +59,8 @@ No production changes are authorized by review convergence alone.
 ### Round 2
 
 - The human explicitly confirmed starting round 2 after round-one resolution.
-- [Complete reviewer reports](round_02/reviewer_report.md).
-- [Annotated resolution proposal](round_02/goldfish_review_report.md).
+- [Complete reviewer reports](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/review_loop/round_02/reviewer_report.md).
+- [Annotated resolution proposal](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/review_loop/round_02/goldfish_review_report.md).
 - Input target SHA-256: `5098c3f703c8802b1b14b5914121a228e85cc450e05547123b6ff247cb70a7ee`.
 - All three fresh reviewers completed; no failure or retry occurred.
 - Design and structure found no issues.
@@ -76,8 +76,8 @@ No production changes are authorized by review convergence alone.
 ### Round 3
 
 - The human explicitly confirmed round 3 after round-two resolution.
-- [Complete reviewer reports](round_03/reviewer_report.md).
-- [Annotated Nit-resolution proposals](round_03/goldfish_review_report.md).
+- [Complete reviewer reports](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/review_loop/round_03/reviewer_report.md).
+- [Annotated Nit-resolution proposals](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/review_loop/round_03/goldfish_review_report.md).
 - Input target SHA-256: `e30014c820e96d42e0057529c7d8975fa82ece504aea2aa2aff23d5612bbcf9d`.
 - All three fresh reviewers completed; no failure or retry occurred.
 - Design and structure found no issues.

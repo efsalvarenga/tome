@@ -37,13 +37,13 @@ The feature range was the complete specification, lines 1-1052.
 
 | Stage | Reviewer | Status | Report |
 | :--- | :--- | :--- | :--- |
-| 5: Initial Zoom Out | `egm-zoom-out` | Completed | [Initial report](zoom_out_report.md) |
-| 5: Initial Zoom Out | `egm-inventive-catalyst` | Completed | [Initial report](zoom_out_report.md) |
-| 6: Comprehension | `egm-comprehension` | Completed | [Complete paraphrases and findings](comprehension_report.md) |
-| 7: Critic | `egm-design` | Completed | [Critic report](critic_report.md) |
-| 7: Critic | `egm-structural` | Completed | [Critic report](critic_report.md) |
-| 7: Critic | `egm-style` | Completed | [Critic report](critic_report.md) |
-| 8: Intermediate Zoom Out | `egm-zoom-out` | Completed | [Intermediate report](intermediate_zoom_out_report.md) |
+| 5: Initial Zoom Out | `egm-zoom-out` | Completed | [Initial report](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/zoom_out_report.md) |
+| 5: Initial Zoom Out | `egm-inventive-catalyst` | Completed | [Initial report](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/zoom_out_report.md) |
+| 6: Comprehension | `egm-comprehension` | Completed | [Complete paraphrases and findings](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/comprehension_report.md) |
+| 7: Critic | `egm-design` | Completed | [Critic report](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/critic_report.md) |
+| 7: Critic | `egm-structural` | Completed | [Critic report](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/critic_report.md) |
+| 7: Critic | `egm-style` | Completed | [Critic report](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/critic_report.md) |
+| 8: Intermediate Zoom Out | `egm-zoom-out` | Completed | [Intermediate report](https://github.com/efsalvarenga/tome/blob/88df7b6d4ee387d5eefa45cef2479044f64b989b/docs/reviews/001_tome_core_architecture_egm/intermediate_zoom_out_report.md) |
 | 9: Implementation Readiness | No reviewer dispatched | Not applicable | No separate implementation plan; user-approved exclusion |
 
 All seven requested reviewers completed.
