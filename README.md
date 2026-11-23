@@ -68,10 +68,10 @@ TOME combines **Chris Engle's Matrix Games** with **Cezar Capacle's Triple-O fra
 The engine is a library with one entry point:
 
 ```text
-run(request, proposal_generator, peer_reviewer, failure_resolver, umpire_review=None) -> RunResult  # or raises RunError
+run(request, proposal_generator, peer_reviewer, failure_resolver, umpire_review=None) -> RunResult
 ```
 
-* **Input:** a complete world state, a number of turns, and optional spark tables, first-round order, and random seed.
+* **Input:** `contract_version: "1.1.0"`, a complete world state, a number of turns, and optional spark tables, first-round order, and random seed.
 * **Callables:** the caller supplies the proposal generator and peer reviewer (typically wrapping an LLM) and the umpire's failure resolver; the pre-roll umpire review is optional.
 * **Output:** the final world state and one audit record per turn.
 * **Failure:** a failed run raises a `RunError` subclass and publishes no partial result; `RunError.to_failure()` gives the serialisable `RunFailure`.

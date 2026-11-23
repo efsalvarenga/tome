@@ -512,20 +512,21 @@ Unit tests live in `tests/test_tome_core.py`, and integration tests in `tests/te
 ### Amendment A1: Post-Review Simplifications (2026-11-23)
 
 The human developer approved these changes on 2026-11-23 after the zero-context review of PR #12 (trace `pr-12-2f571609`).
-None changes the result or error type that `run()` produces; where they conflict with the text above, this amendment wins.
+For every draw that `random.Random` can produce, none changes the result or error type of `run()`; where they conflict with the text above, this amendment wins.
 
 *   **Runner (Target File 12):** step 4 always calls `random.Random(request.seed)`, which seeds from system entropy when the seed is `None`.
     The four callback invocations share one `_invoke` helper that applies D12.
     The two post-condition invariant checks are removed, because they cannot fail by construction.
-*   **Mechanics (Target File 9):** only `tier_for_roll` checks the d6 range.
-    `draw_turn_cues`, `roll_resolution`, and `default_spark_tables` no longer catch errors, so a die, table-lookup, or built-in-table defect reaches the D13 handler in `run()` and still raises `MechanicsError`.
+*   **Mechanics (Target File 9):** only `tier_for_roll` checks the d6 range, and `draw_turn_cues` samples from the `TABLE_NAMES` tuple directly.
+    `draw_turn_cues`, `roll_resolution`, and `default_spark_tables` no longer catch errors, so a table-lookup or built-in-table defect reaches the D13 handler in `run()` and still raises `MechanicsError`.
+    Resolution dice are bounded only through `TurnRecord.resolution_roll` (2 to 12), so an impossible pair such as `(0, 7)` is no longer detected; `random.Random.randint(1, 6)` cannot produce one.
 *   **Gates (Target File 10):** `apply_umpire_rejections` copies only rejected evaluations; the rejection record relies on model revalidation for its independent copy.
 *   **Models and errors (Target Files 6 and 8):** the first-round-order check compares sorted lists, and `RunError.to_failure` uses `CONTRACT_VERSION`.
 *   **Public API (Target Files 13 and 14):** `TrioTier` is exported, because it appears in the `ProposalGenerator` signature.
     `run`, `PeerEvaluation`, and the four protocols gain short docstrings.
 *   **Documentation (Target Files 4 and 5):** the README project structure lists top-level directories only and states that a failed run raises `RunError`; `AGENTS.md` points to the README's execution contract instead of repeating it.
 *   **Tests:** `test_net_modifier_clamps` covers the vote sums -6, -4, -3, 0, 3, 4, and 6.
-    `test_run_reports_mechanics_defects` replaces the direct mechanics checks with die, table-entry, and built-in-table defects raised through `run()`.
+    `test_run_reports_mechanics_defects` replaces the direct mechanics checks with table-entry and built-in-table defects raised through `run()`; `test_tier_mapping_rejects_invalid_faces` still covers the d6 range check.
     `test_seeded_runs_are_reproducible` runs with seeds 0 and 42 and asserts that turn draws vary within one run (issue #9).
     `test_umpire_records_in_peer_order` no longer requires unrejected evaluations to be copied.
 
