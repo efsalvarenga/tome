@@ -87,6 +87,7 @@ See the [specification](docs/designs/001_tome_core_architecture.md) for the full
 ```text
 tome/
 ├── docs/       # Design specifications, implementation plans, and EGM review records
+├── scenarios/  # Scenario template, public examples, and gitignored private/ workspace policy
 ├── scripts/    # lint.sh, the locked verification gate
 ├── src/tome/   # Engine package; `tome` re-exports the public API from `tome.engine`
 └── tests/      # Contract, mechanics, and end-to-end tests
@@ -110,6 +111,13 @@ cd tome
 # Install the package in editable mode with development dependencies
 uv sync --locked --extra dev
 ```
+
+### Scenario Playtesting
+
+Read the [scenarios workspace guide](scenarios/README.md), copy the [scenario template](scenarios/scenario_template.md), or inspect the neutral [Actor A and Actor B example](scenarios/examples/actor_a_actor_b.md).
+Scenario Markdown files are authoring aids for assisted playtests rather than a format loaded natively by `tome`.
+Callers translate their contents into `WorldState`, `RunRequest`, and callback inputs.
+Keep local or restricted playtests and all of their derived artefacts inside `scenarios/private/`, which is ignored by Git as documented in [`scenarios/README.md`](scenarios/README.md).
 
 ### Verification
 
