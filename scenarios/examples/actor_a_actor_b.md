@@ -61,7 +61,7 @@ These questions guide inspection of the resulting trajectory rather than prescri
 ## Umpire Guidance (Optional)
 
 - Pre-roll review of shifted votes: Disabled for this baseline four-turn example.
-- Failure adjudication: Restate the lowest-voted peer objection as a concrete commercial consequence that preserves future playability.
+- Failure adjudication: On a failed roll, restate a suitable lowest-voted peer objection as a concrete commercial consequence (`source_voter_actor_id` set to that peer), or supply an independent commercial consequence (`source_voter_actor_id: null`) when the peer vote is `0` or `+1` yet the roll falls below `7` and the peer's argument offers no usable failure reason, ensuring the statement matches neither existing `canon_facts` nor the failed proposal's `world_change_statement`.
 - Additional plausibility guidance: Treat any modification to the standing offer's commitment or cancellation terms as requiring Actor B's agreement rather than unilateral acceptance.
 
 ## Before the Playtest
@@ -72,6 +72,7 @@ These questions guide inspection of the resulting trajectory rather than prescri
 - [x] Check that facts provide the grounding needed for the actors to act.
 - [x] Keep the turn count positive and the seed and starting indices non-negative integers.
 - [x] Keep the first run short so its proposals, votes, consequences, and final canon are easy to inspect.
+- [x] Adjust relative links for `scenarios/examples/` depth and confirm `## Licence & Attribution` matches this public example.
 
 ## Licence & Attribution
 

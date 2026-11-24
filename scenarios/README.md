@@ -30,6 +30,7 @@ cp scenarios/scenario_template.md scenarios/private/my_case/scenario.md
 
 * Create `scenarios/private/` with `mkdir -p scenarios/private` and add a dedicated subdirectory for your local scenario.
 * Copy [`scenario_template.md`](scenario_template.md) into that subdirectory under `scenarios/private/` and fill in your run settings, actors, and starting canon facts.
+* Adjust or remove relative links for the `scenarios/private/<case>/` directory depth, and replace the template's public CC BY-SA 4.0 notice under `## Licence & Attribution` with appropriate private handling or ownership terms.
 * Translate the scenario into `WorldState`, `RunRequest`, and callback inputs in your local runner to execute the playtest.
 * Write every derived artefact inside the same subdirectory under `scenarios/private/`, including serialised JSON requests and states, turn logs such as `log.jsonl`, checkpoints, rendered prompts, raw model responses, attachments, and replay reports.
 
@@ -50,7 +51,7 @@ The `/scenarios/private/` rule in `.gitignore` is a convenience safeguard agains
 
 ## Licence & Attribution
 
-Public scenario templates, documentation, and public examples tracked in `scenarios/` are licensed under the [Creative Commons Attribution-ShareAlike 4.0 International Licence (CC BY-SA 4.0)](https://creativecommons.org/licenses/by-sa/4.0/), distinct from the [MIT License](../LICENSE) that governs the simulation engine code in `src/tome/`.
+Public scenario templates, documentation, and public examples tracked in `scenarios/` are licensed under the [Creative Commons Attribution-ShareAlike 4.0 International Licence (CC BY-SA 4.0)](https://creativecommons.org/licenses/by-sa/4.0/), distinct from the [MIT License](../LICENSE) that governs the repository's software code (including `src/tome/`).
 
 These public playtest materials accompany game mechanics derived from:
 
