@@ -54,7 +54,7 @@ def _git(
     if env_overrides is not None:
         env.update(env_overrides)
     return subprocess.run(
-        ["git", "--no-pager", *args],
+        ["git", "--no-pager", "-c", f"core.excludesFile={os.devnull}", *args],
         cwd=cwd,
         env=env,
         check=check,
