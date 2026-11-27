@@ -145,7 +145,7 @@ def test_repo_git_tracking_and_ignore_rules() -> None:
 
     for doc_path in _public_scenario_docs():
         rel_path = str(doc_path.relative_to(REPO_ROOT))
-        probe = _git("check-ignore", "-q", rel_path, check=False)
+        probe = _git("check-ignore", "--no-index", "-q", rel_path, check=False)
         assert probe.returncode == 1, f"Expected {rel_path} not to be ignored by .gitignore"
 
 
@@ -251,8 +251,27 @@ def test_gitignore_covers_private_subtree_synthetically(
     host_index_before = _git("ls-files", "--stage").stdout if _has_repo_git() else None
 
     poisoned_index = tmp_path / "poisoned_index"
+    poisoned_ignore = (
+        "*.md\n"
+        "scenarios/examples/sample.md\n"
+        "!scenarios/private\n"
+        "!scenarios/private/\n"
+        "!scenarios/private/**\n"
+    )
+    xdg_config_home = tmp_path / "xdg_config"
+    xdg_ignore_file = xdg_config_home / "git" / "ignore"
+    xdg_ignore_file.parent.mkdir(parents=True)
+    xdg_ignore_file.write_text(poisoned_ignore, encoding="utf-8")
+
+    poisoned_home = tmp_path / "home"
+    home_ignore_file = poisoned_home / ".config" / "git" / "ignore"
+    home_ignore_file.parent.mkdir(parents=True)
+    home_ignore_file.write_text(poisoned_ignore, encoding="utf-8")
+
     monkeypatch.setenv("GIT_DIR", str(REPO_ROOT / ".git"))
     monkeypatch.setenv("GIT_INDEX_FILE", str(poisoned_index))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg_config_home))
+    monkeypatch.setenv("HOME", str(poisoned_home))
 
     dir_repo = tmp_path / "dir_repo"
     dir_repo.mkdir()
@@ -277,6 +296,79 @@ def test_gitignore_covers_private_subtree_synthetically(
     assert staged == [".gitignore", "scenarios/examples/sample.md"]
     assert (dir_repo / ".git").is_dir()
     assert not poisoned_index.exists()
+    assert (
+        _git(
+            "check-ignore",
+            "--no-index",
+            "-q",
+            "scenarios/examples/sample.md",
+            cwd=dir_repo,
+            check=False,
+        ).returncode
+        == 1
+    )
+    assert (
+        _git(
+            "check-ignore",
+            "--no-index",
+            "-q",
+            "scenarios/examples/sample.md",
+            cwd=dir_repo,
+            check=False,
+            env_overrides={"XDG_CONFIG_HOME": ""},
+        ).returncode
+        == 1
+    )
+    assert (
+        _git(
+            "check-ignore",
+            "-q",
+            "scenarios/private/synthetic/scenario.md",
+            cwd=dir_repo,
+            check=False,
+            env_overrides={"XDG_CONFIG_HOME": ""},
+        ).returncode
+        == 0
+    )
+
+    dir_gitignore = dir_repo / ".gitignore"
+    try:
+        dir_gitignore.write_text(f"{gitignore_text.rstrip()}\nscenarios/\n", encoding="utf-8")
+        assert (
+            _git(
+                "check-ignore",
+                "-q",
+                "scenarios/examples/sample.md",
+                cwd=dir_repo,
+                check=False,
+            ).returncode
+            == 1
+        )
+        assert (
+            _git(
+                "check-ignore",
+                "--no-index",
+                "-q",
+                "scenarios/examples/sample.md",
+                cwd=dir_repo,
+                check=False,
+            ).returncode
+            == 0
+        )
+    finally:
+        dir_gitignore.write_text(gitignore_text, encoding="utf-8")
+
+    assert (
+        _git(
+            "check-ignore",
+            "--no-index",
+            "-q",
+            "scenarios/examples/sample.md",
+            cwd=dir_repo,
+            check=False,
+        ).returncode
+        == 1
+    )
 
     external_private = tmp_path / "external_private"
     external_private.mkdir()
@@ -300,6 +392,29 @@ def test_gitignore_covers_private_subtree_synthetically(
             _git("diff", "--cached", "--name-only", cwd=symlink_repo).stdout.splitlines()
         )
         assert symlink_staged == [".gitignore", "scenarios/examples/sample.md"]
+        assert (
+            _git(
+                "check-ignore",
+                "--no-index",
+                "-q",
+                "scenarios/examples/sample.md",
+                cwd=symlink_repo,
+                check=False,
+                env_overrides={"XDG_CONFIG_HOME": ""},
+            ).returncode
+            == 1
+        )
+        assert (
+            _git(
+                "check-ignore",
+                "-q",
+                "scenarios/private",
+                cwd=symlink_repo,
+                check=False,
+                env_overrides={"XDG_CONFIG_HOME": ""},
+            ).returncode
+            == 0
+        )
         assert not poisoned_index.exists()
 
     if host_index_before is not None:
@@ -312,6 +427,10 @@ def test_packaging_and_test_discovery_exclude_private_scenarios() -> None:
     testpaths = pyproject["tool"]["pytest"]["ini_options"]["testpaths"]
     assert testpaths == ["tests"]
     assert all("scenarios" not in entry for entry in testpaths)
+
+    ruff_extend_exclude = pyproject["tool"]["ruff"].get("extend-exclude", [])
+    assert isinstance(ruff_extend_exclude, list)
+    assert "scenarios/private" in ruff_extend_exclude
 
     assert pyproject["build-system"]["build-backend"] == "hatchling.build"
     hatch_build = pyproject.get("tool", {}).get("hatch", {}).get("build", {})
@@ -327,7 +446,7 @@ def test_packaging_and_test_discovery_exclude_private_scenarios() -> None:
     assert (REPO_ROOT / "src" / "tome").is_dir()
 
     for cfg in (hatch_build, sdist_cfg, wheel_cfg):
-        for key in ("force-include", "include", "only-include", "packages"):
+        for key in ("artifacts", "force-include", "include", "only-include", "packages"):
             if key in cfg:
                 assert "scenarios/private" not in json.dumps(cfg[key])
 
