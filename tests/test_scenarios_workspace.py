@@ -63,7 +63,7 @@ def _git(
     )
 
 
-def _check_public_not_ignored(
+def _probe_ignore_no_index(
     rel_path: str,
     *,
     cwd: Path = REPO_ROOT,
@@ -165,7 +165,7 @@ def test_repo_git_tracking_and_ignore_rules() -> None:
 
     for doc_path in _public_scenario_docs():
         rel_path = str(doc_path.relative_to(REPO_ROOT))
-        probe = _check_public_not_ignored(rel_path)
+        probe = _probe_ignore_no_index(rel_path)
         assert probe.returncode == 1, (
             f"Expected {rel_path} not to be ignored by .gitignore "
             f"(returncode={probe.returncode}, stderr={probe.stderr.strip()!r})"
@@ -314,7 +314,7 @@ def test_gitignore_covers_private_subtree_synthetically(
     assert (dir_repo / ".git").is_dir()
     assert not poisoned_index.exists()
 
-    home_probe = _check_public_not_ignored(
+    home_probe = _probe_ignore_no_index(
         "scenarios/examples/sample.md",
         cwd=dir_repo,
         env_overrides={"XDG_CONFIG_HOME": ""},
@@ -327,7 +327,7 @@ def test_gitignore_covers_private_subtree_synthetically(
     dir_gitignore = dir_repo / ".gitignore"
     try:
         dir_gitignore.write_text(f"{gitignore_text.rstrip()}\nscenarios/\n", encoding="utf-8")
-        widened_probe = _check_public_not_ignored("scenarios/examples/sample.md", cwd=dir_repo)
+        widened_probe = _probe_ignore_no_index("scenarios/examples/sample.md", cwd=dir_repo)
         assert widened_probe.returncode == 0, (
             "Expected widened .gitignore to match tracked scenarios/examples/sample.md "
             f"(returncode={widened_probe.returncode}, stderr={widened_probe.stderr.strip()!r})"
@@ -393,9 +393,8 @@ def test_packaging_and_test_discovery_exclude_private_scenarios() -> None:
     assert pyproject["build-system"]["build-backend"] == "hatchling.build"
     hatch_build = pyproject.get("tool", {}).get("hatch", {}).get("build", {})
     targets = hatch_build.get("targets", {})
-    sdist_cfg = targets.get("sdist", {})
     wheel_cfg = targets.get("wheel", {})
-    all_hatch_cfgs = (hatch_build, sdist_cfg, wheel_cfg, *targets.values())
+    all_hatch_cfgs = (hatch_build, *targets.values())
 
     wheel_packages = wheel_cfg.get("packages", [f"src/{pyproject['project']['name']}"])
     assert wheel_packages == ["src/tome"]
@@ -405,7 +404,7 @@ def test_packaging_and_test_discovery_exclude_private_scenarios() -> None:
         assert not cfg.get("ignore-vcs", False)
         assert not cfg.get("artifacts")
         assert not cfg.get("force-include")
-        for key in ("artifacts", "force-include", "include", "only-include", "packages"):
+        for key in ("include", "only-include", "packages"):
             if key in cfg:
                 assert "scenarios/private" not in json.dumps(cfg[key])
 
