@@ -11,7 +11,7 @@ It is scenario-agnostic: the caller supplies the actors, the established facts, 
 
 $$\mathcal{M}(\text{WorldState}_{t}, \text{RunRequest}) \longrightarrow (\text{WorldState}_{t+n}, \text{TurnRecord}_{1..n})$$
 
-> **Status:** `src/tome/` implements Spec 1.1.3 (Interface Contract 1.1.0; editorial revision under review).
+> **Status:** `src/tome/` implements Spec 1.1.3 (Interface Contract 1.1.0).
 > It is checked by tests derived from Section 7 of the [specification](docs/designs/001_tome_core_architecture.md).
 
 ---

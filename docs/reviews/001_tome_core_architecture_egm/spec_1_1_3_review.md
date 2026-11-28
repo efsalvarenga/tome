@@ -54,4 +54,4 @@ Residual Nit accepted without change: the acronym "EGM" is not expanded inline (
 Review verdict: Approved — two consecutive clean rounds (rounds 2 and 3) with no Blocker or Major findings.
 The delta states D12 exactly, the Python 3.11 exception-hierarchy claims were verified empirically (`asyncio.CancelledError`, `KeyboardInterrupt`, `SystemExit` are `BaseException`-only; `concurrent.futures.CancelledError` and `MemoryError` are `Exception` subclasses), and the engine's `_invoke` implements the boundary as written.
 Interface Contract 1.1.0, mechanics, rules, and tests are unchanged; `./scripts/lint.sh` passes on tracked files (273 tests).
-Human developer sign-off on Spec Version 1.1.3 remains pending and is recorded as an unchecked item in the specification's Section 8.
+The human developer signed off Spec Version 1.1.3 on 2026-11-28, recorded in the specification's Section 8; the EGM gate is closed.

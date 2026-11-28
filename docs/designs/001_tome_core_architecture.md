@@ -6,7 +6,7 @@
 | :--- | :--- |
 | Spec Version | 1.1.3 |
 | Interface Contract Version | 1.1.0 |
-| Status | Under Review |
+| Status | Approved |
 | Author | Elephant Agent & Developer |
 | Target Milestone | v0.1.0 (Core Engine & Pure-Python Mechanics) |
 
@@ -14,7 +14,7 @@
 
 | Spec Version | Summary |
 | :--- | :--- |
-| 1.1.3 | Editorial, 2026-11-27: stated the [implementation plan](../plans/001_tome_core_architecture_plan.md) decision-D12 callback exception boundary in Section 3.5 and aligned the passages that previously said a callback failure or cancellation raises a typed error (the two Section 3.5 sentences for the umpire review and the failure resolver, Edge Cases 6, 11, and 14, Invariant 15, and the Section 7 umpire-audit and failure-resolver bullets): any `Exception` other than `MemoryError` raised by a callback, including a cancellation signalled by an `Exception` subclass such as `concurrent.futures.CancelledError`, becomes that callback's error type, while `MemoryError` and non-`Exception` exceptions propagate unchanged. Also stated that Invariant 15 describes the meaning of `MechanicsError` rather than requiring an explicit check for each die. Interface Contract 1.1.0, mechanics, rules, and tests are unchanged; human sign-off pending. |
+| 1.1.3 | Editorial, 2026-11-27: stated the [implementation plan](../plans/001_tome_core_architecture_plan.md) decision-D12 callback exception boundary in Section 3.5 and aligned the passages that previously said a callback failure or cancellation raises a typed error (the two Section 3.5 sentences for the umpire review and the failure resolver, Edge Cases 6, 11, and 14, Invariant 15, and the Section 7 umpire-audit and failure-resolver bullets): any `Exception` other than `MemoryError` raised by a callback, including a cancellation signalled by an `Exception` subclass such as `concurrent.futures.CancelledError`, becomes that callback's error type, while `MemoryError` and non-`Exception` exceptions propagate unchanged. Also stated that Invariant 15 describes the meaning of `MechanicsError` rather than requiring an explicit check for each die. Interface Contract 1.1.0, mechanics, rules, and tests are unchanged; EGM review approved, human developer signed off on 2026-11-28. |
 | 1.1.2 | Review resolution, 2026-11-14: documented alternatives, caller-owned workload budgets and runtime limits, append-only historical canon, and trusted-adapter boundaries; corrected callback return guidance, audit/determinism wording, review-history labels, and Markdown layout. Interface Contract 1.1.0 is unchanged; the review loop converged on 2026-11-14 and the human developer signed off on 2026-11-17. |
 | 1.1.1 | Editorial, 2026-11-13: replaced setting-specific example text with neutral placeholders (Actor A, Actor B, "Fact 1.", "outcome X") so the specification describes no particular scenario. No change to the interface contract, mechanics, rules, or tests; the Goldfish approval of 1.1.0 applies unchanged. |
 | 1.1.0 | Approved 2026-11-11 after four Goldfish passes: adopted per-turn d6 tiers, tier-independent spark sampling, canon-only grounding, binary 2d6 resolution against 7, optional pre-roll umpire rejections, mandatory failure consequences, strict value/error rules, seeded draw order, and the caller-owned run contract. Removed persistent posture, traits/exhaustion, boons, outcome bands, `goal_alignment`, and `active_rumors`. Interface Contract 1.1.0; detailed review chronology is recorded in Section 8. |
@@ -1131,16 +1131,17 @@ The human developer signed off the review revisions on 2026-11-11.
 - [x] Goldfish confirmation of corrected contract gaps for Spec Version 1.1.0
 - [x] Human developer approval of Spec Version 1.1.0 signed off on 2026-11-11
 
-### Current Specification: Spec Version 1.1.3 (Under Review)
+### Current Approved Specification: Spec Version 1.1.3
 
 Spec Version 1.1.3 is an editorial revision of the approved Spec Version 1.1.2: it states the [implementation plan](../plans/001_tome_core_architecture_plan.md) decision-D12 callback exception boundary in Section 3.5 and aligns the passages that previously said a callback failure or cancellation raises a typed error — the two Section 3.5 sentences for the umpire review and the failure resolver, Edge Cases 6, 11, and 14, Invariant 15, and the Section 7 "Umpire Audit and Errors" and "Failure Resolver Errors" bullets.
 It also states that Invariant 15 describes the meaning of `MechanicsError` rather than requiring an explicit check for each die.
 Interface Contract 1.1.0, mechanics, rules, and tests are unchanged.
+The human developer signed off Spec Version 1.1.3 on 2026-11-28.
 
-- [x] EGM review of Spec Version 1.1.3 recorded in [spec_1_1_3_review.md](../reviews/001_tome_core_architecture_egm/spec_1_1_3_review.md) — verdict Approved, human sign-off pending
-- [ ] Human developer sign-off on Spec Version 1.1.3
+- [x] EGM review of Spec Version 1.1.3 recorded in [spec_1_1_3_review.md](../reviews/001_tome_core_architecture_egm/spec_1_1_3_review.md) — verdict Approved
+- [x] Human developer sign-off on Spec Version 1.1.3 recorded on 2026-11-28
 
-### Approved Specification: Spec Version 1.1.2 (proposed successor: Spec Version 1.1.3, under review)
+### Approved Specification: Spec Version 1.1.2 (superseded by Spec Version 1.1.3)
 
 The [official-workflow review of Spec Version 1.1.1](../reviews/001_tome_core_architecture_egm/consolidated_review_report.md) completed on 2026-11-13 with `Verdict: Revisions Required`.
 The [annotated resolution report](../reviews/001_tome_core_architecture_egm/goldfish_review_report.md) records the dispositions and approved documentation changes for this revision.
