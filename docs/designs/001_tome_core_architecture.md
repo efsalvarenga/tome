@@ -4,7 +4,7 @@
 
 | Metadata | Value |
 | :--- | :--- |
-| Spec Version | 1.1.2 |
+| Spec Version | 1.1.3 |
 | Interface Contract Version | 1.1.0 |
 | Status | Approved |
 | Author | Elephant Agent & Developer |
@@ -14,6 +14,7 @@
 
 | Spec Version | Summary |
 | :--- | :--- |
+| 1.1.3 | Editorial, 2026-11-27: stated the [implementation plan](../plans/001_tome_core_architecture_plan.md) decision-D12 callback exception boundary in Section 3.5 and aligned the passages that previously said a callback failure or cancellation raises a typed error (the two Section 3.5 sentences for the umpire review and the failure resolver, Edge Cases 6, 11, and 14, Invariant 15, and the Section 7 umpire-audit and failure-resolver bullets): any `Exception` other than `MemoryError` raised by a callback, including a cancellation signalled by an `Exception` subclass such as `concurrent.futures.CancelledError`, becomes that callback's error type, while `MemoryError` and non-`Exception` exceptions propagate unchanged. Also stated that Invariant 15 describes the meaning of `MechanicsError` rather than requiring an explicit check for each die. Interface Contract 1.1.0, mechanics, rules, and tests are unchanged; EGM review approved, human developer signed off on 2026-11-28. |
 | 1.1.2 | Review resolution, 2026-11-14: documented alternatives, caller-owned workload budgets and runtime limits, append-only historical canon, and trusted-adapter boundaries; corrected callback return guidance, audit/determinism wording, review-history labels, and Markdown layout. Interface Contract 1.1.0 is unchanged; the review loop converged on 2026-11-14 and the human developer signed off on 2026-11-17. |
 | 1.1.1 | Editorial, 2026-11-13: replaced setting-specific example text with neutral placeholders (Actor A, Actor B, "Fact 1.", "outcome X") so the specification describes no particular scenario. No change to the interface contract, mechanics, rules, or tests; the Goldfish approval of 1.1.0 applies unchanged. |
 | 1.1.0 | Approved 2026-11-11 after four Goldfish passes: adopted per-turn d6 tiers, tier-independent spark sampling, canon-only grounding, binary 2d6 resolution against 7, optional pre-roll umpire rejections, mandatory failure consequences, strict value/error rules, seeded draw order, and the caller-owned run contract. Removed persistent posture, traits/exhaustion, boons, outcome bands, `goal_alignment`, and `active_rumors`. Interface Contract 1.1.0; detailed review chronology is recorded in Section 8. |
@@ -787,6 +788,9 @@ Each callable must return the declared schema and must not mutate its arguments.
 The runner supplies isolated snapshots of the current state and proposal.
 Any adapter retry policy is outside the engine contract.
 Engine errors expose the stable `code` and a human-readable `message` through `RunFailure`; only `code` is part of the stable contract, and an execution bridge maps them into its chosen transport response without returning partial state.
+Callback exception boundary: a callback signals failure or cancellation by raising an `Exception` subclass, such as `concurrent.futures.CancelledError` or a caller-defined cancellation exception.
+Any such exception, including a `RunError`, is wrapped in that callback's error type, chained with `from`; the only `Exception` subclass that propagates unchanged is `MemoryError`.
+Exceptions that are not `Exception` subclasses, such as `KeyboardInterrupt`, `SystemExit`, or `asyncio.CancelledError`, also propagate unchanged.
 
 Proposal-generator output is checked in this order, and the first failing check decides the error:
 
@@ -812,7 +816,7 @@ The baseline and public argument are unchanged.
 The engine builds `UmpireRejectionRecord` entries itself and includes them in peer-evaluation order; peer-review providers cannot supply these records.
 
 If the callback is absent or no shifted votes remain, it is not invoked and `umpire_rejections` is empty.
-Duplicate/unknown voter IDs, rejection of a vote already at baseline, blank reasons, malformed output, or a callback failure/cancellation raise `UmpireReviewError` with code `UMPIRE_REVIEW_FAILED`.
+Duplicate/unknown voter IDs, rejection of a vote already at baseline, blank reasons, malformed output, or a callback exception per the boundary above (wrapped unless it is `MemoryError` or not an `Exception` subclass) raise `UmpireReviewError` with code `UMPIRE_REVIEW_FAILED`.
 The engine must not silently proceed, retry, or publish a partial result on callback failure.
 
 After every failed roll, the runner invokes the caller-supplied, human-umpire-controlled `FailureResolver` before updating canon or time counters.
@@ -833,7 +837,7 @@ The original returned text is stored in canon and the audit record after those c
 The engine records the validated decision in `failure_resolution` and applies it before the next actor's turn.
 On Success, `FailureResolver` is not invoked and `failure_resolution` is null.
 
-A missing decision, a non-lowest/unknown source actor, a non-null source when no peers exist, blank fields, an already-canonical or rejected-proposal statement, malformed output, or callback failure/cancellation raises `UmpireResolutionError` with code `UMPIRE_RESOLUTION_FAILED`.
+A missing decision, a non-lowest/unknown source actor, a non-null source when no peers exist, blank fields, an already-canonical or rejected-proposal statement, malformed output, or a callback exception per the boundary above (wrapped unless it is `MemoryError` or not an `Exception` subclass) raises `UmpireResolutionError` with code `UMPIRE_RESOLUTION_FAILED`.
 A missing `FailureResolver` is never discovered here: it is rejected before the first turn with `InvalidRunRequestError`.
 The engine does not replace an invalid decision with a random argument, generated story, or no-change outcome.
 It does not retry or publish partial state on this error.
@@ -902,7 +906,9 @@ The active actor and current world state provide narrative context; only `canon_
     The first posture roll is `1` (Obvious), selected tables are `Disposition` then `Motivation`, their d66 rolls are `21` and `11`, and resolution dice are `4` and `5` (base total `9`).
 * **Invariant 15 (Explicit Failure Types):** Invalid requests and missing required callables raise `InvalidRunRequestError` before the first turn; proposal generation, invalid proposals, peer review, umpire review, umpire failure resolution, and mechanics failures raise their corresponding `RunError` type.
   No engine-level retry or partial result is permitted.
+  Callback exceptions are never `MechanicsError`: per the Section 3.5 boundary, any `Exception` other than `MemoryError` raised by a callback becomes that callback's error type, while `MemoryError` and non-`Exception` exceptions propagate unchanged.
   `MechanicsError` signals a violated internal engine invariant, such as a die result, table lookup, or counter outside its defined range.
+  This describes the meaning of `MechanicsError`; it does not require a separate explicit check for every individual draw.
   It indicates an engine defect, never a legitimate game outcome or invalid caller or adapter input.
 * **Invariant 16 (Narrative Sparks):** Use the built-in default set when the request omits `spark_tables`, or the complete valid caller override when supplied.
   Every turn uniformly selects two distinct tables from the effective set without using the tier as a selection criterion; all table pairs are available to every tier, and selection resets each turn.
@@ -987,6 +993,7 @@ A caller may persist the returned state and turn records as it chooses.
 * **Edge Case 5: Invalid Run Request:** A non-positive `turn_count`, negative seed, empty actor set, blank or matching actor IDs, blank or matching canon facts, an undeclared field, a boolean where an integer is expected, a `contract_version` other than `"1.1.0"`, or a `first_round_order` that is not an exact permutation is rejected with `InvalidRunRequestError` before execution.
   The caller's input state remains untouched.
 * **Edge Case 6: Proposal or Peer-Review Failure:** Any caller-supplied proposal-generator or peer-reviewer failure, including malformed output, aborts with `ProposalGenerationError` or `PeerReviewError`.
+  A callback exception follows the Section 3.5 boundary.
   The engine does not retry.
   No partial state or turn records are returned.
 * **Edge Case 7: Proposal Without Grounded Pros:** Ungrounded pros are pruned.
@@ -1002,7 +1009,7 @@ A caller may persist the returned state and turn records as it chooses.
   A valid rejection is normal adjudication, not an engine failure.
 * **Edge Case 11: Optional Pre-Roll Intervention:** An absent `UmpireReview`, no remaining shifted votes, or an empty rejection list adds no vote-approval requirement.
   Mechanically valid shifts proceed.
-  A configured review callback that fails or returns invalid decisions raises `UmpireReviewError`; it must not be treated as no intervention.
+  A configured review callback that raises per the Section 3.5 exception boundary or returns invalid decisions raises `UmpireReviewError`; it must not be treated as no intervention.
   This optional review does not remove the need for `FailureResolver` after a failed roll.
 * **Edge Case 12: Neutral or Positive Failure Candidates:** A failed roll can occur even when every peer voted 0 or +1.
   Select candidates at the lowest final value anyway.
@@ -1013,7 +1020,7 @@ A caller may persist the returned state and turn records as it chooses.
 * **Edge Case 14: Missing or Invalid Failure Decision:** A missing `FailureResolver` is rejected with `InvalidRunRequestError` before the first turn, not discovered at the first failed roll.
   At a failed roll, a missing or invalid decision raises `UmpireResolutionError`.
   Choosing a non-lowest or unknown peer source, or a non-null source when no peers exist, is invalid.
-  Callback failure/cancellation also aborts the run with no partial result.
+  A callback exception also aborts the run with no partial result; per the Section 3.5 boundary it becomes `UmpireResolutionError` unless it is `MemoryError` or not an `Exception` subclass, in which case it propagates unchanged.
 * **Edge Case 15: Proposal Already in Canon:** A proposal whose normalized statement matches an existing canon fact would add nothing on Success.
   It is rejected with `InvalidProposalError` before peer review, so no peer calls or resolution dice are spent on it.
   The engine does not request regeneration.
@@ -1058,7 +1065,7 @@ A caller may persist the returned state and turn records as it chooses.
   Callback decisions consume no RNG draws.
 * **Umpire Audit and Errors:** Assert mechanically validated evaluations and user reasons are retained independently in peer order for each rejected shift.
   For a peer returning baseline `1`, final `0`, `biased_shift_applied: false`, and anchor `'  "Fact 1."  '` that the umpire rejects, assert `UmpireReview` receives and `evaluation_before_reversion` stores `biased_shift_applied: true` and `cited_anchor: "Fact 1."`, while the final evaluation has `final_vote: 1`, flag false, and anchor null.
-  Reject duplicate/unknown voters, votes already at baseline, blank reasons, malformed returns, and callback failures/cancellation with `UmpireReviewError`; preserve the submitted state and return no partial result.
+  Reject duplicate/unknown voters, votes already at baseline, blank reasons, malformed returns, and callback exceptions per the Section 3.5 boundary with `UmpireReviewError`; preserve the submitted state and return no partial result.
 * **Proposal and Evaluation Schemas:** Assert adapter output validation, engine attachment of turn mechanics to `ProposalDraft`, and one ordered peer evaluation per non-active actor.
 * **Voting Metadata:** Assert normalized shift flags follow the numeric shift, grounding checks, and any umpire rejections, including inconsistent adapter flags.
   Assert a retained shift with anchor `'  "Fact 1."  '` stores `cited_anchor: "Fact 1."`, the matched canon fact's original text.
@@ -1083,7 +1090,7 @@ A caller may persist the returned state and turn records as it chooses.
   If no candidate is usable or there are no peers, accept an umpire-supplied null-source consequence with a rationale.
 * **New Failure State:** Reject blank consequences, statements matching a canon fact (Section 3.0), and statements matching the rejected proposal.
   Assert each resolved Failure changes `canon_facts`, not just the time counters.
-* **Failure Resolver Errors:** Reject a missing decision, unknown or non-lowest sources, invalid fields, and callback failure/cancellation with `UmpireResolutionError`.
+* **Failure Resolver Errors:** Reject a missing decision, unknown or non-lowest sources, invalid fields, and callback exceptions per the Section 3.5 boundary with `UmpireResolutionError`.
   A one-actor failure requires a null source.
   No invalid decision may become a no-op, automatic tie-break, generated fallback, or partial run result.
 * **Required Callables:** Assert a `run` call whose `proposal_generator`, `peer_reviewer`, or `failure_resolver` is `None` or not callable raises `InvalidRunRequestError` before the first turn, with no callable invoked and no random draws.
@@ -1124,7 +1131,17 @@ The human developer signed off the review revisions on 2026-11-11.
 - [x] Goldfish confirmation of corrected contract gaps for Spec Version 1.1.0
 - [x] Human developer approval of Spec Version 1.1.0 signed off on 2026-11-11
 
-### Current Approved Specification: Spec Version 1.1.2
+### Current Approved Specification: Spec Version 1.1.3
+
+Spec Version 1.1.3 is an editorial revision of the approved Spec Version 1.1.2: it states the [implementation plan](../plans/001_tome_core_architecture_plan.md) decision-D12 callback exception boundary in Section 3.5 and aligns the passages that previously said a callback failure or cancellation raises a typed error — the two Section 3.5 sentences for the umpire review and the failure resolver, Edge Cases 6, 11, and 14, Invariant 15, and the Section 7 "Umpire Audit and Errors" and "Failure Resolver Errors" bullets.
+It also states that Invariant 15 describes the meaning of `MechanicsError` rather than requiring an explicit check for each die.
+Interface Contract 1.1.0, mechanics, rules, and tests are unchanged.
+The human developer signed off Spec Version 1.1.3 on 2026-11-28.
+
+- [x] EGM review of Spec Version 1.1.3 recorded in [spec_1_1_3_review.md](../reviews/001_tome_core_architecture_egm/spec_1_1_3_review.md) — verdict Approved
+- [x] Human developer sign-off on Spec Version 1.1.3 recorded on 2026-11-28
+
+### Approved Specification: Spec Version 1.1.2 (superseded by Spec Version 1.1.3)
 
 The [official-workflow review of Spec Version 1.1.1](../reviews/001_tome_core_architecture_egm/consolidated_review_report.md) completed on 2026-11-13 with `Verdict: Revisions Required`.
 The [annotated resolution report](../reviews/001_tome_core_architecture_egm/goldfish_review_report.md) records the dispositions and approved documentation changes for this revision.
